@@ -1,0 +1,149 @@
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '6.0.54'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+// Mojang ships Java 17 to end users in 1.18+, so your mod should target Java 17.
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
+minecraft {
+    mappings channel: mapping_channel, version: mapping_version
+
+    // REQUIRED for the MDK template to function: runs ProcessResources on IDE output.
+    copyIdeResources = true
+
+    // Default run configurations.
+    runs {
+        configureEach {
+            workingDirectory project.file('run')
+
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        client {
+            property 'forge.enabledGameTestNamespaces', mod_id
+        }
+
+        server {
+            property 'forge.enabledGameTestNamespaces', mod_id
+            args '--nogui'
+        }
+
+        gameTestServer {
+            property 'forge.enabledGameTestNamespaces', mod_id
+        }
+
+        data {
+            workingDirectory project.file('run-data')
+
+            args '--mod', mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+        }
+    }
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+repositories {
+    // Forge 官方 maven 在本机网段完全不可达（直连超时，走 7897 代理只有 ~1 KB/s），
+    // 而 CreeperHost 的 maven 镜像完整同步了 Forge/MCP/Mojang 的全部坐标，实测 0.1–0.6 MB/s。
+    // 这是本项目的首选镜像；BMCLAPI 保留为备用（它的 302 跳转目标目前大面积失效）。
+    maven {
+        name = 'CreeperHost'
+        url = 'https://maven.creeperhost.net/'
+    }
+    maven {
+        name = 'BMCLAPI-Maven'
+        url = 'https://bmclapi2.bangbang93.com/maven/'
+    }
+
+    // If you have mod jar dependencies in ./libs, you can declare them as a repository like so.
+    // flatDir { dir 'libs' }
+}
+
+// ForgeGradle 自己会往 project repositories 里加 Forge 官方 maven（apply 插件时，早于上面的块）。
+// Forge 官方源在本机不可用（TUN 下直接超时），MCPRepo 拉 mcp_config、ForgeGradle 拉 userdev 都会卡在那里，
+// 所以把该仓库的 URL 直接改写到 BMCLAPI 镜像——不是删掉，路径布局完全一致。
+// 注意：只能改 url，不能改 name——仓库加入 container 后 Gradle 禁止重命名
+// （"The name of an ArtifactRepository cannot be changed after it has been added"）。
+repositories.all {
+    if (it instanceof MavenArtifactRepository) {
+        String current = it.url.toString()
+        if (current.contains('maven.minecraftforge.net')) {
+            it.url = 'https://maven.creeperhost.net/'
+        }
+        // libraries.minecraft.net 保持原样：Mojang CDN 本机直连很快（200/0.3s），
+        // 而 BMCLAPI 的 libraries 镜像会 302 到已失效的 minio 对象存储（读取 30s 超时）。
+    }
+}
+
+dependencies {
+    // The "userdev" classifier will be requested and setup by ForgeGradle.
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+}
+
+// Expand ${} placeholders in resources. With copyIdeResources on, this also runs before launches.
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+            minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
+            forge_version: forge_version, forge_version_range: forge_version_range,
+            loader_version_range: loader_version_range,
+            mod_id: mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
+            mod_authors: mod_authors, mod_description: mod_description,
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties + [project: project]
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : mod_authors,
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.jar.archiveVersion,
+                'Implementation-Vendor'   : mod_authors,
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
+    }
+
+    // This is the preferred method to reobfuscate your jar file
+    finalizedBy 'reobfJar'
+}
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            artifact jar
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/mcmodsrepo"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
