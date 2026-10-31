@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>天灾单区块模拟分析</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { color-scheme: light; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+  body { margin: 0; padding: 24px 16px 48px; background: #f4f5f7; color: #1f2328; }
+  main { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .sub { color: #59636e; font-size: 13px; margin-bottom: 20px; }
+  .card { background: #fff; border: 1px solid #d8dee4; border-radius: 8px; padding: 18px; margin-bottom: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px 18px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+  input { width: 100%; box-sizing: border-box; padding: 7px 9px; font-size: 14px; border: 1px solid #c6cdd5; border-radius: 5px; }
+  input:focus { outline: 2px solid #2f81f7; outline-offset: 0; border-color: #2f81f7; }
+  .hint { color: #6e7781; font-size: 12px; margin-top: 4px; min-height: 16px; }
+  .actions { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+  button { padding: 8px 20px; font-size: 14px; border: 0; border-radius: 5px; background: #1f6feb; color: #fff; cursor: pointer; }
+  button:disabled { background: #8fb6ea; cursor: progress; }
+  button.secondary { background: #eaeef2; color: #1f2328; border: 1px solid #c6cdd5; }
+  button.secondary:disabled { background: #f2f4f6; color: #8c959f; border-color: #d8dee4; }
+  #status { font-size: 13px; color: #59636e; }
+  #status.error { color: #b42318; font-weight: 600; }
+  #status.done { color: #1a7f37; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #e6eaef; vertical-align: top; }
+  th { color: #59636e; font-weight: 600; width: 34%; }
+  td { font-variant-numeric: tabular-nums; }
+  .meta { color: #59636e; font-size: 12.5px; margin-bottom: 10px; }
+  .empty { color: #6e7781; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>天灾单区块模拟分析</h1>
+  <div class="sub">直接调用模组当前的纯场算法（DisasterField），统计单个区块被天灾覆盖的时间。20 tick = 1 秒。</div>
+
+  <form id="form" class="card">
+    <div class="grid">
+      <div>
+        <label for="seed">世界种子 seed</label>
+        <input id="seed" name="seed" type="number" step="1" value="0" required>
+        <div class="hint">整数，可为负数</div>
+      </div>
+      <div>
+        <label for="chunkX">区块 X</label>
+        <input id="chunkX" name="chunkX" type="number" step="1" value="0" required>
+        <div class="hint">单位：区块</div>
+      </div>
+      <div>
+        <label for="chunkZ">区块 Z</label>
+        <input id="chunkZ" name="chunkZ" type="number" step="1" value="0" required>
+        <div class="hint">单位：区块</div>
+      </div>
+      <div>
+        <label for="totalTicks">模拟总 tick</label>
+        <input id="totalTicks" name="totalTicks" type="number" step="1" min="1" value="12000000" required>
+        <div class="hint" id="totalHint"></div>
+      </div>
+      <div>
+        <label for="centersPerKm2">centersPerKm2</label>
+        <input id="centersPerKm2" name="centersPerKm2" type="number" step="1" min="1" max="4096" value="1" required>
+        <div class="hint">每 km² 中心数</div>
+      </div>
+      <div>
+        <label for="kappa">kappa</label>
+        <input id="kappa" name="kappa" type="number" step="0.001" min="0.05" max="1.15" value="0.35" required>
+        <div class="hint">巢域半径 / 格距</div>
+      </div>
+      <div>
+        <label for="layers">layers</label>
+        <input id="layers" name="layers" type="number" step="1" min="1" max="2" value="2" required>
+        <div class="hint">1 或 2</div>
+      </div>
+      <div>
+        <label for="walkSpeedBlocksPerTick">移动速度（格/tick）</label>
+        <input id="walkSpeedBlocksPerTick" name="walkSpeedBlocksPerTick" type="number" step="0.001" min="0.01" max="2" value="0.145" required>
+        <div class="hint">walkSpeedBlocksPerTick；范围 0.01–2.0</div>
+      </div>
+      <div>
+        <label for="durationSeconds">天灾时长（秒）</label>
+        <input id="durationSeconds" name="durationSeconds" type="number" step="1" min="121" max="3600" value="600" required>
+        <div class="hint" id="durationHint"></div>
+      </div>
+      <div>
+        <label for="radiusChunks">最大半径（区块）</label>
+        <input id="radiusChunks" name="radiusChunks" type="number" step="1" min="1" max="32" value="8" required>
+        <div class="hint">生成/衰减阶段的最大覆盖半径；1 区块 = 16 格</div>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="run" type="submit">运行模拟</button>
+      <button id="generate" type="button" class="secondary">生成配置文件</button>
+      <span id="status">等待运行</span>
+    </div>
+    <div class="hint">配置文件只包含六项场参数，不含 seed、区块坐标和模拟时长；下载后放入 <code>config/</code> 并重启游戏。</div>
+  </form>
+
+  <section id="result" class="card hidden">
+    <div id="meta" class="meta"></div>
+    <table>
+      <tbody id="stats"></tbody>
+    </table>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  var TICKS_PER_SECOND = 20;
+  var CONFIG_FIELDS = [
+    "centersPerKm2", "kappa", "layers",
+    "walkSpeedBlocksPerTick", "durationSeconds", "radiusChunks"
+  ];
+  var form = document.getElementById("form");
+  var runButton = document.getElementById("run");
+  var generateButton = document.getElementById("generate");
+  var statusBox = document.getElementById("status");
+  var resultBox = document.getElementById("result");
+  var statsBody = document.getElementById("stats");
+  var metaBox = document.getElementById("meta");
+  var totalInput = document.getElementById("totalTicks");
+  var durationInput = document.getElementById("durationSeconds");
+  var totalHint = document.getElementById("totalHint");
+  var durationHint = document.getElementById("durationHint");
+  var timer = null;
+  var startedAt = 0;
+
+  function num(value, digits) {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) {
+      return "—";
+    }
+    return Number(value).toLocaleString("zh-CN", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: digits === undefined ? 2 : digits
+    });
+  }
+
+  function updateHints() {
+    var ticks = Number(totalInput.value);
+    if (isFinite(ticks) && ticks > 0) {
+      var seconds = ticks / TICKS_PER_SECOND;
+      totalHint.textContent = num(ticks) + " tick = " + num(seconds) + " 秒（约 "
+        + num(seconds / 3600) + " 小时）";
+    } else {
+      totalHint.textContent = "请输入正整数 tick";
+    }
+    var secondsValue = Number(durationInput.value);
+    if (isFinite(secondsValue) && secondsValue > 0) {
+      durationHint.textContent = num(secondsValue) + " 秒 = " + num(secondsValue * TICKS_PER_SECOND)
+        + " tick；范围 121–3600 秒（必须大于固定 120 秒预警阶段的两倍）";
+    } else {
+      durationHint.textContent = "请输入正整数秒";
+    }
+  }
+
+  totalInput.addEventListener("input", updateHints);
+  durationInput.addEventListener("input", updateHints);
+  updateHints();
+
+  function setStatus(text, kind) {
+    statusBox.textContent = text;
+    statusBox.className = kind || "";
+  }
+
+  function formParams() {
+    return new URLSearchParams(new FormData(form));
+  }
+
+  function configParams() {
+    var params = new URLSearchParams();
+    CONFIG_FIELDS.forEach(function (name) {
+      params.set(name, document.getElementById(name).value);
+    });
+    return params;
+  }
+
+  function configInputsValid() {
+    for (var i = 0; i < CONFIG_FIELDS.length; i++) {
+      var input = document.getElementById(CONFIG_FIELDS[i]);
+      if (!input.checkValidity()) {
+        input.reportValidity();
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function stopTimer() {
+    if (timer !== null) {
+      clearInterval(timer);
+      timer = null;
+    }
+  }
+
+  function startTimer() {
+    startedAt = Date.now();
+    stopTimer();
+    timer = setInterval(function () {
+      setStatus("正在模拟…已用时 " + ((Date.now() - startedAt) / 1000).toFixed(1) + " 秒");
+    }, 200);
+  }
+
+  function durationText(ticks, seconds) {
+    if (ticks === null || ticks === undefined) {
+      return "无完整样本";
+    }
+    return num(ticks) + " tick（" + num(seconds) + " 秒）";
+  }
+
+  function addRow(label, value) {
+    var tr = document.createElement("tr");
+    var th = document.createElement("th");
+    th.textContent = label;
+    var td = document.createElement("td");
+    td.textContent = value;
+    tr.appendChild(th);
+    tr.appendChild(td);
+    statsBody.appendChild(tr);
+  }
+
+  function render(data) {
+    statsBody.textContent = "";
+    addRow("天灾发生时间比例", num(data.occurrenceRatioPercent, 4) + " %");
+    addRow("平均持续时间", durationText(data.averageDurationTicks, data.averageDurationSeconds));
+    addRow("最短持续时间", durationText(data.minDurationTicks, data.minDurationSeconds));
+    addRow("最长持续时间", durationText(data.maxDurationTicks, data.maxDurationSeconds));
+    addRow("中位持续时间", durationText(data.medianDurationTicks, data.medianDurationSeconds));
+    addRow("平均无天灾间隔", durationText(data.averageIdleTicks, data.averageIdleSeconds));
+    addRow("完整样本数", "持续 " + num(data.completeRuns, 0) + " 段，间隔 "
+      + num(data.completeIntervals, 0) + " 段");
+    addRow("覆盖 tick", num(data.activeTicks, 0) + " / " + num(data.totalTicks, 0) + " tick");
+
+    metaBox.textContent = "seed=" + data.seed + "，chunk=(" + data.chunkX + "," + data.chunkZ
+      + ")，总时长 " + num(data.totalTicks, 0) + " tick（" + num(data.totalSeconds) + " 秒）"
+      + "，天灾时长 " + num(data.durationTicks, 0) + " tick（" + num(data.durationSeconds)
+      + " 秒），最大半径 " + num(data.radiusChunks, 0) + " 区块"
+      + "，场参数 centersPerKm2=" + data.centersPerKm2 + "，kappa=" + data.kappa
+      + "，layers=" + data.layers + "，walkSpeedBlocksPerTick=" + data.walkSpeedBlocksPerTick
+      + "，coarseCells=" + data.coarseCells + "，coarseKappa=" + data.coarseKappa
+      + "，计算耗时 " + num(data.elapsedMillis, 0) + " ms";
+    resultBox.classList.remove("hidden");
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    if (!form.reportValidity()) {
+      return;
+    }
+    var params = formParams();
+    runButton.disabled = true;
+    generateButton.disabled = true;
+    resultBox.classList.add("hidden");
+    startTimer();
+
+    fetch("/api/simulate", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+      body: params.toString()
+    })
+      .then(function (response) {
+        return response.text().then(function (text) {
+          var data;
+          try {
+            data = JSON.parse(text);
+          } catch (parseError) {
+            throw new Error("服务返回了无法解析的内容（HTTP " + response.status + "）");
+          }
+          if (!response.ok) {
+            throw new Error(data.error || ("请求失败（HTTP " + response.status + "）"));
+          }
+          return data;
+        });
+      })
+      .then(function (data) {
+        stopTimer();
+        render(data);
+        setStatus("完成", "done");
+      })
+      .catch(function (error) {
+        stopTimer();
+        setStatus("失败：" + error.message, "error");
+      })
+      .finally(function () {
+        stopTimer();
+        runButton.disabled = false;
+        generateButton.disabled = false;
+      });
+  });
+
+  generateButton.addEventListener("click", function () {
+    if (!configInputsValid()) {
+      return;
+    }
+    var params = configParams();
+    runButton.disabled = true;
+    generateButton.disabled = true;
+    setStatus("正在生成配置文件…");
+
+    fetch("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+      body: params.toString()
+    })
+      .then(function (response) {
+        return response.text().then(function (text) {
+          if (!response.ok) {
+            var message = text;
+            try {
+              var data = JSON.parse(text);
+              if (data.error) {
+                message = data.error;
+              }
+            } catch (ignored) {
+              // Keep the raw response text.
+            }
+            throw new Error(message || ("请求失败（HTTP " + response.status + "）"));
+          }
+          return text;
+        });
+      })
+      .then(function (toml) {
+        var blob = new Blob([toml], { type: "application/toml;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement("a");
+        link.href = url;
+        link.download = "naturaldisaster-common.toml";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+        setStatus("已生成 naturaldisaster-common.toml，放入 config/ 后重启游戏", "done");
+      })
+      .catch(function (error) {
+        setStatus("失败：" + error.message, "error");
+      })
+      .finally(function () {
+        runButton.disabled = false;
+        generateButton.disabled = false;
+      });
+  });
+})();
+</script>
+</body>
+</html>
