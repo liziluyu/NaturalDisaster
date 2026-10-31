@@ -12,20 +12,18 @@ import java.util.List;
  * There is no mutable center state and nothing is persisted. The only temporal memoisation is a
  * per-step position cache described below.
  *
- * <p><b>10-second motion quantisation.</b> Center movement is evaluated at steps of
- * {@link #MOTION_STEP_TICKS} ticks (10 s). Within a step the position is constant; the next step
+ * <p><b>1-second motion quantisation.</b> Center movement is evaluated at steps of
+ * {@link #MOTION_STEP_TICKS} ticks (1 s). Within a step the position is constant; the next step
  * recomputes it. The cache is cleared whenever the step changes, so the spline is evaluated at most
- * once per center per 10 s instead of once per tick.
+ * once per center per 1 s instead of once per tick.
  *
  * <p>No trigonometric functions are used at runtime; directions come from {@link DirectionTable}.
  */
 public final class DisasterField {
-    /** 10 seconds at 20 ticks/s. */
-    public static final long MOTION_STEP_TICKS = 200L;
+    /** 1 second at 20 ticks/s. */
+    public static final long MOTION_STEP_TICKS = 20L;
 
-    /** Average roaming speed in blocks/tick (design constant). */
-    private static final double WALK_SPEED = 0.29;
-    /** Segment length T = SEGMENT_FACTOR * R / WALK_SPEED. */
+    /** Segment length T = SEGMENT_FACTOR * R / configured walk speed. */
     private static final double SEGMENT_FACTOR = 1.3;
     /** Waypoint radius as a fraction of the home radius. */
     private static final double WAYPOINT_RADIUS = 0.72;
@@ -65,7 +63,7 @@ public final class DisasterField {
     private final double maxCoarseRadius;
     private final double maxTotalRadius;
 
-    /** Positions for the current 10-second step only; cleared on step change. */
+    /** Positions for the current 1-second step only; cleared on step change. */
     private final Long2ObjectOpenHashMap<CenterPosition> fineCache = new Long2ObjectOpenHashMap<>();
     private final Long2ObjectOpenHashMap<CenterPosition> coarseCache = new Long2ObjectOpenHashMap<>();
     private long cachedStep = Long.MIN_VALUE;
@@ -97,7 +95,7 @@ public final class DisasterField {
     }
 
     /**
-     * Center position at the 10-second step containing {@code tick}, in block coordinates.
+     * Center position at the 1-second step containing {@code tick}, in block coordinates.
      *
      * @param i fine anchor grid X
      * @param j fine anchor grid Z
@@ -127,7 +125,7 @@ public final class DisasterField {
         double az = (j + 0.5 + jitter(i, j, P_ANCHOR_Z)) * spacing;
         double sigma = SIGMA_MIN + SIGMA_RANGE * Hash.unit(Hash.mix(seed, dimensionHash, i, j, P_SIGMA));
         double homeRadius = params.kappa() * spacing * sigma;
-        double segment = SEGMENT_FACTOR * homeRadius / WALK_SPEED;
+        double segment = SEGMENT_FACTOR * homeRadius / params.walkSpeedBlocksPerTick();
         double tau = Hash.unit(Hash.mix(seed, dimensionHash, i, j, P_TAU)) * segment;
         double beta = Hash.unit(Hash.mix(seed, dimensionHash, i, j, P_BETA));
         double eta = Hash.unit(Hash.mix(seed, dimensionHash, i, j, P_ETA));
@@ -160,7 +158,7 @@ public final class DisasterField {
         double sigma = SIGMA_MIN + SIGMA_RANGE
                 * Hash.unit(Hash.mix(seed, dimensionHash, bi, bj, P_COARSE_SIGMA));
         double homeRadius = params.coarseKappa() * coarseSpacing * sigma;
-        double segment = SEGMENT_FACTOR * homeRadius / WALK_SPEED;
+        double segment = SEGMENT_FACTOR * homeRadius / params.walkSpeedBlocksPerTick();
         double tau = Hash.unit(Hash.mix(seed, dimensionHash, bi, bj, P_COARSE_TAU)) * segment;
         double beta = Hash.unit(Hash.mix(seed, dimensionHash, bi, bj, P_COARSE_BETA));
         double eta = Hash.unit(Hash.mix(seed, dimensionHash, bi, bj, P_COARSE_ETA));
@@ -177,30 +175,27 @@ public final class DisasterField {
      * configured density/kappa/radius, never by world size or elapsed time.
      */
     public List<CenterHit> centersAffectingChunk(long tick, int chunkX, int chunkZ) {
-        int radiusChunks = params.disasterRadiusChunks();
-        double radiusBlocks = radiusChunks * 16.0;
+        int maxRadiusChunks = params.disasterRadiusChunks();
+        double maxRadiusBlocks = maxRadiusChunks * 16.0;
         double minX = chunkX * 16.0;
         double minZ = chunkZ * 16.0;
         double maxX = minX + 16.0;
         double maxZ = minZ + 16.0;
-        double expand = maxTotalRadius + radiusBlocks;
+        // Candidates are always expanded by the configured maximum radius, never by the radius an
+        // individual event happens to have on this frame.
+        double expand = maxTotalRadius + maxRadiusBlocks;
 
         int iMin = (int) Math.floor((minX - expand) / spacing);
         int iMax = (int) Math.floor((maxX + expand) / spacing);
         int jMin = (int) Math.floor((minZ - expand) / spacing);
         int jMax = (int) Math.floor((maxZ + expand) / spacing);
 
-        double centreX = minX + 8.0;
-        double centreZ = minZ + 8.0;
-        double radiusSq = radiusBlocks * radiusBlocks;
-
         List<CenterHit> hits = null;
         for (int i = iMin; i <= iMax; i++) {
             for (int j = jMin; j <= jMax; j++) {
                 CenterPosition position = centerPosition(tick, i, j);
-                double dx = position.x() - centreX;
-                double dz = position.z() - centreZ;
-                if (dx * dx + dz * dz <= radiusSq) {
+                int radiusChunks = hitRadius(tick, i, j, maxRadiusChunks);
+                if (coversChunk(position.x(), position.z(), radiusChunks, chunkX, chunkZ)) {
                     if (hits == null) {
                         hits = new ArrayList<>(2);
                     }
@@ -212,11 +207,76 @@ public final class DisasterField {
     }
 
     /**
+     * Radius used for coverage: the event's current radius while it is active, the configured
+     * maximum otherwise. Inactive centers keep the maximum-radius semantics that existing commands
+     * rely on.
+     */
+    private int hitRadius(long tick, int i, int j, int maxRadiusChunks) {
+        EventState event = event(tick, i, j);
+        return event.active() ? event.radiusChunks() : maxRadiusChunks;
+    }
+
+    /**
+     * Pure coverage test shared by every query: a chunk is affected when its centre is within
+     * {@code radiusChunks * 16} blocks of the center.
+     */
+    public static boolean coversChunk(double centerX, double centerZ, int radiusChunks, int chunkX, int chunkZ) {
+        double dx = chunkX * 16.0 + 8.0 - centerX;
+        double dz = chunkZ * 16.0 + 8.0 - centerZ;
+        double radiusBlocks = radiusChunks * 16.0;
+        return dx * dx + dz * dz <= radiusBlocks * radiusBlocks;
+    }
+
+    /**
+     * All centers whose current position lies inside the given rectangle.
+     *
+     * <p>Like every other query here this is a pure function of the tick and the rectangle.
+     * Candidate grid cells are expanded by the maximum possible home-range displacement, so a
+     * center can never be missed; each candidate is then filtered by its actual position. Cost is
+     * proportional to the rectangle's area times the configured density, never to world size or
+     * elapsed time. Centers are returned in ascending {@code i}, then {@code j} order.
+     *
+     * @param minX inclusive minimum block X
+     * @param minZ inclusive minimum block Z
+     * @param maxX inclusive maximum block X
+     * @param maxZ inclusive maximum block Z
+     */
+    public List<CenterHit> centersInRect(long tick, double minX, double minZ, double maxX, double maxZ) {
+        if (maxX < minX || maxZ < minZ) {
+            return List.of();
+        }
+
+        double expand = maxTotalRadius;
+        int iMin = (int) Math.floor((minX - expand) / spacing);
+        int iMax = (int) Math.floor((maxX + expand) / spacing);
+        int jMin = (int) Math.floor((minZ - expand) / spacing);
+        int jMax = (int) Math.floor((maxZ + expand) / spacing);
+
+        int maxRadiusChunks = params.disasterRadiusChunks();
+        List<CenterHit> hits = null;
+        for (int i = iMin; i <= iMax; i++) {
+            for (int j = jMin; j <= jMax; j++) {
+                CenterPosition position = centerPosition(tick, i, j);
+                if (position.x() < minX || position.x() > maxX
+                        || position.z() < minZ || position.z() > maxZ) {
+                    continue;
+                }
+                int radiusChunks = hitRadius(tick, i, j, maxRadiusChunks);
+                if (hits == null) {
+                    hits = new ArrayList<>(2);
+                }
+                hits.add(new CenterHit(i, j, position.x(), position.z(), radiusChunks));
+            }
+        }
+        return hits == null ? List.of() : hits;
+    }
+
+    /**
      * Pure event table: whether the center's disaster is running at {@code tick}.
      *
      * <p>Slots have the configured duration. A slot triggers with a fixed chance, and the previous
      * slot must not have triggered, so an active run is exactly {@code disasterDurationTicks} long
-     * and is followed by at least one empty slot. This mirrors the lit-slot construction.
+     * and is followed by at least one empty slot. This slot construction is independent of visuals.
      */
     public EventState event(long tick, int i, int j) {
         int duration = params.disasterDurationTicks();
@@ -235,7 +295,60 @@ public final class DisasterField {
 
         long startTick = slot * duration - phase;
         long elapsed = tick - startTick;
-        return new EventState(true, startTick, elapsed, duration - elapsed);
+
+        // Existence, phase and effect are decided by the real tick.
+        int warning = params.warningTicks();
+        int growing = params.growingTicks();
+        EventState.Phase lifePhase;
+        if (elapsed < warning) {
+            lifePhase = EventState.Phase.WARNING;
+        } else if (elapsed < (long) warning + growing) {
+            lifePhase = EventState.Phase.GROWING;
+        } else {
+            lifePhase = EventState.Phase.DECAYING;
+        }
+        boolean effectActive = lifePhase != EventState.Phase.WARNING;
+
+        // Only the radius is quantised to the 1-second motion frame.
+        long motionTick = Math.floorDiv(tick, MOTION_STEP_TICKS) * MOTION_STEP_TICKS;
+        int radiusChunks = radiusAt(motionTick, startTick);
+
+        return new EventState(true, startTick, elapsed, duration - elapsed,
+                lifePhase, effectActive, radiusChunks);
+    }
+
+    /**
+     * Integer radius for the motion frame that starts at {@code motionTick}.
+     *
+     * <p>{@code e = motionTick - startTick}. Warning uses {@code ceil(R/2)}; growing uses
+     * {@code ceil(B + (R-B) * clamp((e-W)/G))}; decaying uses
+     * {@code floor(R - (R-B) * clamp((e-W-G)/F))}. The asymmetric rounding is intentional.
+     */
+    private int radiusAt(long motionTick, long startTick) {
+        int maxRadius = params.disasterRadiusChunks();
+        double half = maxRadius / 2.0;
+        long e = motionTick - startTick;
+        int warning = params.warningTicks();
+        int growing = params.growingTicks();
+        int decaying = params.decayingTicks();
+
+        if (e < warning) {
+            return ceilToInt(half);
+        }
+        if (e < (long) warning + growing) {
+            double u = clamp((double) (e - warning) / growing, 0.0, 1.0);
+            return ceilToInt(half + (maxRadius - half) * u);
+        }
+        double v = decaying <= 0 ? 1.0 : clamp((double) (e - warning - growing) / decaying, 0.0, 1.0);
+        return (int) Math.floor(maxRadius - (maxRadius - half) * v);
+    }
+
+    private static int ceilToInt(double value) {
+        return (int) -Math.floor(-value);
+    }
+
+    private static double clamp(double value, double min, double max) {
+        return value < min ? min : Math.min(value, max);
     }
 
     /** Writes the waypoint at segment index {@code e} into {@code out[offset..offset+1]}. */
@@ -252,7 +365,7 @@ public final class DisasterField {
     /** Catmull-Rom position inside the home range. */
     private double[] roam(long motionTick, double ax, double az, double homeRadius,
                           double tau, double beta, double eta) {
-        double segment = SEGMENT_FACTOR * homeRadius / WALK_SPEED;
+        double segment = SEGMENT_FACTOR * homeRadius / params.walkSpeedBlocksPerTick();
         double raw = (motionTick + tau) / segment;
         long e = (long) Math.floor(raw);
         double u = raw - e;

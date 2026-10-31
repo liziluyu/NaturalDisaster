@@ -3,16 +3,18 @@ package com.fst.naturaldisaster.service;
 import com.fst.naturaldisaster.Config;
 import com.fst.naturaldisaster.field.CenterHit;
 import com.fst.naturaldisaster.field.DisasterField;
+import com.fst.naturaldisaster.field.EventState;
 import com.fst.naturaldisaster.field.FieldParams;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.event.level.ChunkEvent;
-import net.minecraftforge.event.level.LevelEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.level.ChunkEvent;
+import net.neoforged.neoforge.event.level.LevelEvent;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +24,7 @@ import java.util.Map;
  *
  * <p>Disasters are only evaluated for chunks that are actually loaded. A chunk is evaluated once
  * when it loads, remembered for as long as it stays loaded, and dropped on unload. The cached result
- * is tagged with the 10-second motion step; if a later query lands in a different step the chunk is
+ * is tagged with the 1-second motion step; if a later query lands in a different step the chunk is
  * re-evaluated lazily, so no per-tick scan of loaded chunks is ever needed.
  */
 public final class DisasterService {
@@ -83,7 +85,8 @@ public final class DisasterService {
                     8,                       // coarseCells (design constant)
                     0.3,                     // coarseKappa (design constant)
                     Config.INSTANCE.disasterDurationSeconds.get() * 20,
-                    Config.INSTANCE.disasterRadiusChunks.get());
+                    Config.INSTANCE.disasterRadiusChunks.get(),
+                    Config.INSTANCE.walkSpeedBlocksPerTick.get());
             this.field = new DisasterField(
                     level.getSeed(),
                     DisasterField.dimensionHash(level.dimension().location().toString()),
@@ -106,10 +109,10 @@ public final class DisasterService {
          * Disaster status for a loaded chunk at {@code tick}, or {@code null} if the chunk is not
          * loaded.
          *
-         * <p>The cached list is valid for the entire 10-second motion step. A step change forces one
-         * re-evaluation; between steps this is a plain map lookup. Critically, this method never
-         * creates an entry: evaluation only happens when a chunk loads (or an already-loaded entry
-         * crosses a motion step), so unloaded chunks are never part of the disaster field.
+         * <p>The cached maximum-radius candidates are valid for the entire 1-second motion step.
+         * Each query applies the current event radius and real-tick state to those candidates. A
+         * step change forces one re-evaluation; no global per-tick scan is needed. This method never
+         * creates an entry, so unloaded chunks are never part of the disaster field.
          */
         public ChunkStatus status(long chunkKey, long tick) {
             ChunkStatus status = loadedChunks.get(chunkKey);
@@ -121,22 +124,62 @@ public final class DisasterService {
                 status = evaluate(chunkKey, tick);
                 loadedChunks.put(chunkKey, status);
             }
-            return status;
+            int chunkX = ChunkPos.getX(chunkKey);
+            int chunkZ = ChunkPos.getZ(chunkKey);
+            List<CenterHit> hits = currentHits(status.hits(), tick, chunkX, chunkZ);
+            return hits == status.hits() ? status : new ChunkStatus(step, hits);
         }
 
+        /** The cache holds maximum-radius candidates so a mid-frame event start cannot be missed. */
         private ChunkStatus evaluate(long chunkKey, long tick) {
             int chunkX = ChunkPos.getX(chunkKey);
             int chunkZ = ChunkPos.getZ(chunkKey);
-            List<CenterHit> hits = field.centersAffectingChunk(tick, chunkX, chunkZ);
+            double radius = field.params().disasterRadiusChunks() * 16.0;
+            double minX = chunkX * 16.0;
+            double minZ = chunkZ * 16.0;
+            List<CenterHit> candidates = field.centersInRect(tick,
+                    minX - radius, minZ - radius, minX + 16.0 + radius, minZ + 16.0 + radius);
+            List<CenterHit> hits = new ArrayList<>(candidates.size());
+            for (CenterHit hit : candidates) {
+                if (DisasterField.coversChunk(hit.x(), hit.z(),
+                        field.params().disasterRadiusChunks(), chunkX, chunkZ)) {
+                    hits.add(hit);
+                }
+            }
             return new ChunkStatus(field.motionStep(tick), hits);
+        }
+
+        /** Applies the real-tick event state and this frame's radius without thinning the cache. */
+        private List<CenterHit> currentHits(List<CenterHit> cached, long tick, int chunkX, int chunkZ) {
+            List<CenterHit> filtered = null;
+            for (int index = 0; index < cached.size(); index++) {
+                CenterHit hit = cached.get(index);
+                EventState event = field.event(tick, hit.gridX(), hit.gridZ());
+                int radius = event.active() ? event.radiusChunks() : field.params().disasterRadiusChunks();
+                boolean covered = DisasterField.coversChunk(hit.x(), hit.z(), radius, chunkX, chunkZ);
+                CenterHit current = radius == hit.radiusChunks() ? hit
+                        : new CenterHit(hit.gridX(), hit.gridZ(), hit.x(), hit.z(), radius);
+                if (filtered == null && covered && current == hit) {
+                    continue;
+                }
+                if (filtered == null) {
+                    filtered = new ArrayList<>(cached.size());
+                    filtered.addAll(cached.subList(0, index));
+                }
+                if (covered) {
+                    filtered.add(current);
+                }
+            }
+            return filtered == null ? cached : filtered;
         }
     }
 
     /**
-     * Cached coverage of one loaded chunk for one motion step.
+     * Cached maximum-radius candidates for one loaded chunk and motion step. {@code status} filters
+     * this superset to the exact current coverage before returning it.
      *
-     * @param step 10-second motion step this coverage belongs to
-     * @param hits centers whose influence covers the chunk
+     * @param step 1-second motion step these candidates belong to
+     * @param hits maximum-radius candidates retained for the whole step
      */
     public record ChunkStatus(long step, List<CenterHit> hits) {
     }
