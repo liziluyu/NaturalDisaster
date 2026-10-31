@@ -1,17 +1,13 @@
 pluginManagement {
     repositories {
-        // 国内镜像：本机到 maven.minecraftforge.net 直连/代理均被限速到 KB 级，
-        // BMCLAPI 镜像同一套 Maven 布局（ForgeGradle 插件、forge userdev、MCP 配置都在），实测 MB 级。
-        maven {
-            name = 'BMCLAPI'
-            url = 'https://bmclapi2.bangbang93.com/maven/'
-        }
+        mavenLocal()
         gradlePluginPortal()
-        maven {
-            name = 'MinecraftForge'
-            url = 'https://maven.minecraftforge.net/'
-        }
+        maven { url = 'https://maven.neoforged.net/releases' }
     }
+}
+
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
 }
 
 rootProject.name = 'NaturalDisaster'

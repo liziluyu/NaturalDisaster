@@ -1,26 +1,19 @@
-# eclipse
-bin
-*.launch
-.settings
-.metadata
-.classpath
-.project
+# Gradle cache/build output
+.gradle
+build
 
-# idea
+# IntelliJ
 out
 *.ipr
 *.iws
 *.iml
 .idea
 
-# gradle
-build
-.gradle
-
-# other
-eclipse
+# Runtime working directories
 run
-build_log.txt
+run-data
 
-# Files from Forge MDK
-forge*changelog.txt
+# Other
+eclipse
+hs_err_pid*
+.DS_Store

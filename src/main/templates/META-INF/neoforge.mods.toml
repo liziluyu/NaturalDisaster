@@ -1,0 +1,33 @@
+modLoader = "javafml"
+loaderVersion = "${loader_version_range}"
+license = "${mod_license}"
+
+[[mods]]
+modId = "${mod_id}"
+version = "${mod_version}"
+displayName = "${mod_name}"
+authors = "${mod_authors}"
+description = '''${mod_description}'''
+
+[[dependencies."${mod_id}"]]
+modId = "neoforge"
+type = "required"
+versionRange = "${neo_version_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "minecraft"
+type = "required"
+versionRange = "${minecraft_version_range}"
+ordering = "NONE"
+side = "BOTH"
+
+# 可选前置：Xaero 的世界地图。缺失时本模组照常加载；存在时地图相关集成才启用。
+# 1.21.1 NeoForge 版为 1.47.0（libs/ 内的开发用 jar，兼容 MC [1.21,1.21.2) / NeoForge [21.0.110-beta,21.2.0)）。
+[[dependencies."${mod_id}"]]
+modId = "xaeroworldmap"
+type = "optional"
+versionRange = "[1.47.0,)"
+ordering = "AFTER"
+side = "BOTH"
