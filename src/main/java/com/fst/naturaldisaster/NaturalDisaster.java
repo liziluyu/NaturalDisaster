@@ -1,17 +1,19 @@
 package com.fst.naturaldisaster;
 
 import com.fst.naturaldisaster.command.DisasterCommands;
+import com.fst.naturaldisaster.network.DisasterNetwork;
 import com.fst.naturaldisaster.service.DisasterService;
+import com.fst.naturaldisaster.service.DisasterSyncService;
 import com.mojang.logging.LogUtils;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.event.server.ServerStartingEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import org.slf4j.Logger;
 
 /**
@@ -22,26 +24,27 @@ import org.slf4j.Logger;
  */
 @Mod(NaturalDisaster.MODID)
 public final class NaturalDisaster {
-    /** Must match {@code mod_id} in gradle.properties and META-INF/mods.toml. */
+    /** Must match {@code mod_id} in gradle.properties and META-INF/neoforge.mods.toml. */
     public static final String MODID = "naturaldisaster";
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    public NaturalDisaster(FMLJavaModLoadingContext context) {
-        IEventBus modEventBus = context.getModEventBus();
+    public NaturalDisaster(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(DisasterNetwork::register);
 
-        MinecraftForge.EVENT_BUS.register(this);
-        MinecraftForge.EVENT_BUS.register(DisasterService.INSTANCE);
+        NeoForge.EVENT_BUS.register(this);
+        NeoForge.EVENT_BUS.register(DisasterService.INSTANCE);
+        NeoForge.EVENT_BUS.register(DisasterSyncService.INSTANCE);
 
-        context.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        LOGGER.info("Natural Disaster common setup: centersPerKm2={}, kappa={}, layers={}, litDuration={}, disasterDurationSeconds={}, disasterRadiusChunks={}",
+        LOGGER.info("Natural Disaster common setup: centersPerKm2={}, kappa={}, layers={}, disasterDurationSeconds={}, disasterRadiusChunks={}",
                 Config.INSTANCE.centersPerKm2.get(), Config.INSTANCE.kappa.get(),
-                Config.INSTANCE.layers.get(), Config.INSTANCE.litDuration.get(),
-                Config.INSTANCE.disasterDurationSeconds.get(), Config.INSTANCE.disasterRadiusChunks.get());
+                Config.INSTANCE.layers.get(), Config.INSTANCE.disasterDurationSeconds.get(),
+                Config.INSTANCE.disasterRadiusChunks.get());
     }
 
     @SubscribeEvent
