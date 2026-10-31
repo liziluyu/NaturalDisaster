@@ -1,6 +1,7 @@
 package com.fst.naturaldisaster.command;
 
 import com.fst.naturaldisaster.field.CenterHit;
+import com.fst.naturaldisaster.field.CenterPosition;
 import com.fst.naturaldisaster.field.DisasterField;
 import com.fst.naturaldisaster.field.EventState;
 import com.fst.naturaldisaster.service.DisasterService;
@@ -11,7 +12,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraftforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,9 +20,17 @@ import java.util.Locale;
 
 /**
  * {@code /disaster ison}: report the disaster state of the command source's current chunk.
+ *
+ * <p>{@code /disaster locate}: scan a bounded neighbourhood of the deterministic center grid and
+ * report the nearest running disaster center.
+ *
+ * <p>{@code /disaster debug ...} (see {@link DisasterDebugCommands}) exercises the generic effect
+ * primitives without a disaster event.
  */
 public final class DisasterCommands {
     private static final int MAX_REPORTED = 16;
+    /** Maximum anchor-grid rings inspected by {@code locate}; independent of world size. */
+    private static final int LOCATE_RINGS = 24;
 
     private DisasterCommands() {
     }
@@ -30,7 +39,10 @@ public final class DisasterCommands {
         event.getDispatcher().register(
                 Commands.literal("disaster")
                         .then(Commands.literal("ison")
-                                .executes(DisasterCommands::execute)));
+                                .executes(DisasterCommands::execute))
+                        .then(Commands.literal("locate")
+                                .executes(DisasterCommands::locate))
+                        .then(DisasterDebugCommands.root(event.getBuildContext())));
     }
 
     private static int execute(CommandContext<CommandSourceStack> context) {
@@ -80,15 +92,94 @@ public final class DisasterCommands {
             EventState event = entry.event();
             long remainingSeconds = (event.remaining() + 19L) / 20L;
             source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                    " - center (%d, %d) at (%d, %d), radius %d chunk(s), %d s left",
+                    " - center (%d, %d) at (%d, %d), phase %s, radius %d chunk(s), effect %s, %d s left",
                     hit.gridX(), hit.gridZ(), Math.round(hit.x()), Math.round(hit.z()),
-                    hit.radiusChunks(), remainingSeconds)), false);
+                    event.phase(), event.radiusChunks(), event.effectActive() ? "on" : "off",
+                    remainingSeconds)), false);
         }
         if (active.size() > shown) {
             source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
                     " ... and %d more", active.size() - shown)), false);
         }
         return active.size();
+    }
+
+    /**
+     * Reports the nearest center whose pure event is active. The scan covers a fixed number of
+     * anchor-grid rings around the command source, so its cost is bounded by density and never by
+     * world size or elapsed time. It does not require chunks to be loaded and never force-loads.
+     */
+    private static int locate(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        ServerLevel level = source.getLevel();
+        long tick = level.getGameTime();
+        DisasterField field = DisasterService.INSTANCE.state(level).field();
+
+        double playerX = source.getPosition().x;
+        double playerZ = source.getPosition().z;
+        double spacing = field.params().gridSpacing();
+        int centerI = (int) Math.floor(playerX / spacing);
+        int centerJ = (int) Math.floor(playerZ / spacing);
+
+        Nearest nearest = new Nearest();
+        consider(nearest, field, tick, centerI, centerJ, playerX, playerZ);
+        for (int ring = 1; ring <= LOCATE_RINGS; ring++) {
+            int minI = centerI - ring;
+            int maxI = centerI + ring;
+            int minJ = centerJ - ring;
+            int maxJ = centerJ + ring;
+
+            for (int i = minI; i <= maxI; i++) {
+                consider(nearest, field, tick, i, minJ, playerX, playerZ);
+                consider(nearest, field, tick, i, maxJ, playerX, playerZ);
+            }
+            for (int j = minJ + 1; j < maxJ; j++) {
+                consider(nearest, field, tick, minI, j, playerX, playerZ);
+                consider(nearest, field, tick, maxI, j, playerX, playerZ);
+            }
+        }
+
+        if (nearest.event == null) {
+            double scannedBlocks = (LOCATE_RINGS + 1) * spacing;
+            source.sendFailure(Component.literal(String.format(Locale.ROOT,
+                    "No active disaster within %d center-grid steps (~%d blocks) of (%d, %d).",
+                    LOCATE_RINGS, Math.round(scannedBlocks), Math.round(playerX), Math.round(playerZ))));
+            return 0;
+        }
+
+        CenterHit hit = nearest.hit;
+        EventState event = nearest.event;
+        long remainingSeconds = (event.remaining() + 19L) / 20L;
+        source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
+                "Nearest active disaster: center (%d, %d) at (%d, %d), %d block(s) away, "
+                        + "phase %s, radius %d chunk(s), effect %s, %d s left.",
+                hit.gridX(), hit.gridZ(), Math.round(hit.x()), Math.round(hit.z()),
+                Math.round(Math.sqrt(nearest.distanceSquared)), event.phase(), event.radiusChunks(),
+                event.effectActive() ? "on" : "off", remainingSeconds)), false);
+        return 1;
+    }
+
+    private static void consider(Nearest nearest, DisasterField field, long tick,
+                                 int i, int j, double x, double z) {
+        EventState event = field.event(tick, i, j);
+        if (!event.active()) {
+            return;
+        }
+        CenterPosition position = field.centerPosition(tick, i, j);
+        double dx = position.x() - x;
+        double dz = position.z() - z;
+        double distanceSquared = dx * dx + dz * dz;
+        if (distanceSquared < nearest.distanceSquared) {
+            nearest.hit = new CenterHit(i, j, position.x(), position.z(), event.radiusChunks());
+            nearest.event = event;
+            nearest.distanceSquared = distanceSquared;
+        }
+    }
+
+    private static final class Nearest {
+        private CenterHit hit;
+        private EventState event;
+        private double distanceSquared = Double.POSITIVE_INFINITY;
     }
 
     private record ActiveHit(CenterHit hit, EventState event) {
