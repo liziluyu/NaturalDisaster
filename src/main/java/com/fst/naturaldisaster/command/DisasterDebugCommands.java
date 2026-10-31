@@ -1,6 +1,7 @@
 package com.fst.naturaldisaster.command;
 
 import com.fst.naturaldisaster.effect.DisasterEffects;
+import com.fst.naturaldisaster.effect.ForcedWeather;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -43,7 +44,8 @@ public final class DisasterDebugCommands {
                 .requires(source -> source.hasPermission(2))
                 .then(viewDistance())
                 .then(effect(buildContext))
-                .then(fog());
+                .then(fog())
+                .then(weather());
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> viewDistance() {
@@ -103,6 +105,25 @@ public final class DisasterDebugCommands {
                                         .then(Commands.argument("targets", EntityArgument.players())
                                                 .executes(context -> setFogColor(context,
                                                         EntityArgument.getPlayers(context, "targets")))))));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> weather() {
+        return Commands.literal("weather")
+                .then(Commands.literal("stop")
+                        .executes(context -> stopForcedWeather(context, defaultTargets(context)))
+                        .then(Commands.argument("targets", EntityArgument.players())
+                                .executes(context -> stopForcedWeather(context,
+                                        EntityArgument.getPlayers(context, "targets")))))
+                .then(Commands.literal("rain")
+                        .executes(context -> forceWeather(context, defaultTargets(context), ForcedWeather.RAIN))
+                        .then(Commands.argument("targets", EntityArgument.players())
+                                .executes(context -> forceWeather(context,
+                                        EntityArgument.getPlayers(context, "targets"), ForcedWeather.RAIN))))
+                .then(Commands.literal("thunder")
+                        .executes(context -> forceWeather(context, defaultTargets(context), ForcedWeather.THUNDER))
+                        .then(Commands.argument("targets", EntityArgument.players())
+                                .executes(context -> forceWeather(context,
+                                        EntityArgument.getPlayers(context, "targets"), ForcedWeather.THUNDER))));
     }
 
     private static Collection<ServerPlayer> defaultTargets(CommandContext<CommandSourceStack> context)
@@ -195,6 +216,32 @@ public final class DisasterDebugCommands {
         int count = targets.size();
         context.getSource().sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
                 "Restored vanilla fog rendering for %d player(s).", count)), false);
+        return count;
+    }
+
+    private static int forceWeather(CommandContext<CommandSourceStack> context,
+                                    Collection<ServerPlayer> targets, ForcedWeather weather) {
+        for (ServerPlayer player : targets) {
+            DisasterEffects.forceWeather(player, weather);
+        }
+        int count = targets.size();
+        String label = weather == ForcedWeather.THUNDER ? "thunderstorm" : "rain";
+        context.getSource().sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
+                "Forcing client-side %s display for %d player(s); "
+                        + "run /disaster debug weather stop to clear it.",
+                label, count)), false);
+        return count;
+    }
+
+    private static int stopForcedWeather(CommandContext<CommandSourceStack> context,
+                                         Collection<ServerPlayer> targets) {
+        for (ServerPlayer player : targets) {
+            DisasterEffects.stopForcedWeather(player);
+        }
+        int count = targets.size();
+        context.getSource().sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
+                "Cleared the forced client-side weather display for %d player(s); "
+                        + "vanilla weather rendering resumed.", count)), false);
         return count;
     }
 }

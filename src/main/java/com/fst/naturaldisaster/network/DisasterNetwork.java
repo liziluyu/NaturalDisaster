@@ -15,7 +15,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  * same payload types with no-op handlers so both sides agree on the protocol.
  */
 public final class DisasterNetwork {
-    private static final String VERSION = "3";
+    private static final String VERSION = "4";
 
     private DisasterNetwork() {
     }
@@ -38,6 +38,11 @@ public final class DisasterNetwork {
                     .playToClient(
                             ClientFogColorPayload.TYPE,
                             ClientFogColorPayload.STREAM_CODEC,
+                            (payload, context) -> {
+                            })
+                    .playToClient(
+                            ClientWeatherPayload.TYPE,
+                            ClientWeatherPayload.STREAM_CODEC,
                             (payload, context) -> {
                             });
         }

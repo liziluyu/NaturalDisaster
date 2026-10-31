@@ -2,15 +2,19 @@ package com.fst.naturaldisaster.client;
 
 import com.fst.naturaldisaster.NaturalDisaster;
 import com.fst.naturaldisaster.effect.DisasterEffects;
+import com.fst.naturaldisaster.effect.ForcedWeather;
 import com.fst.naturaldisaster.network.ClientFogColorPayload;
 import com.fst.naturaldisaster.network.ClientViewDistancePayload;
+import com.fst.naturaldisaster.network.ClientWeatherPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.OptionInstance;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.util.Mth;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.ViewportEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -24,6 +28,13 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  * from permanently changing the player's settings. Fog colour is a volatile render-time value and
  * is dropped on disconnect; nothing is persisted.
  *
+ * <p>Forced weather writes the local level's rain/thunder render levels directly, which is what
+ * {@code LevelRenderer}, the sky and the rain sound read. Vanilla only changes those levels when a
+ * weather packet arrives, so the override is re-asserted every client tick and the last values
+ * reported by the server are kept aside; stopping or disconnecting writes those values back so
+ * vanilla weather resumes exactly where the server left it. No server weather is changed or
+ * simulated.
+ *
  * <p>This class is only loaded on the client. The shared network registration calls
  * {@link #register(PayloadRegistrar)} behind a dist check.
  */
@@ -35,6 +46,12 @@ public final class ClientDisasterEffects {
 
     private static int originalViewDistance = NO_ORIGINAL;
     private static volatile FogColor fogColor;
+    private static ForcedWeather forcedWeather;
+    private static ClientLevel forcedLevel;
+    private static float vanillaRainLevel;
+    private static float vanillaThunderLevel;
+    private static float appliedRainLevel;
+    private static float appliedThunderLevel;
 
     private ClientDisasterEffects() {
     }
@@ -48,7 +65,11 @@ public final class ClientDisasterEffects {
                 .playToClient(
                         ClientFogColorPayload.TYPE,
                         ClientFogColorPayload.STREAM_CODEC,
-                        ClientDisasterEffects::handleFogColor);
+                        ClientDisasterEffects::handleFogColor)
+                .playToClient(
+                        ClientWeatherPayload.TYPE,
+                        ClientWeatherPayload.STREAM_CODEC,
+                        ClientDisasterEffects::handleWeather);
     }
 
     private static void handleViewDistance(ClientViewDistancePayload payload, IPayloadContext context) {
@@ -72,6 +93,81 @@ public final class ClientDisasterEffects {
                         channel(payload.blue()));
             }
         });
+    }
+
+    private static void handleWeather(ClientWeatherPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (payload.restore()) {
+                stopForcedWeather();
+            } else {
+                forceWeather(payload.weather());
+            }
+        });
+    }
+
+    private static void forceWeather(ForcedWeather weather) {
+        ClientLevel level = Minecraft.getInstance().level;
+        if (level == null) {
+            return;
+        }
+        if (forcedWeather == null || level != forcedLevel) {
+            rememberVanillaWeather(level);
+        }
+        forcedWeather = weather;
+        forcedLevel = level;
+        applyForcedWeather(level, weather);
+    }
+
+    private static void stopForcedWeather() {
+        ClientLevel level = Minecraft.getInstance().level;
+        // Write the remembered values back only into the level that was actually overridden.
+        if (level != null && level == forcedLevel) {
+            level.setRainLevel(vanillaRainLevel);
+            level.setThunderLevel(vanillaThunderLevel);
+        }
+        forcedWeather = null;
+        forcedLevel = null;
+    }
+
+    private static void rememberVanillaWeather(ClientLevel level) {
+        vanillaRainLevel = level.rainLevel;
+        vanillaThunderLevel = level.thunderLevel;
+    }
+
+    private static void applyForcedWeather(ClientLevel level, ForcedWeather weather) {
+        // Thunder is rendered as getThunderLevel() = lerp(thunder) * getRainLevel(), so a
+        // thunderstorm needs full rain as well; plain rain keeps thunder at zero.
+        appliedRainLevel = 1.0F;
+        appliedThunderLevel = weather == ForcedWeather.THUNDER ? 1.0F : 0.0F;
+        // setRainLevel/setThunderLevel write both the current and the previous value, so the
+        // vanilla partial-tick lerp cannot flicker between the old and the forced level.
+        level.setRainLevel(appliedRainLevel);
+        level.setThunderLevel(appliedThunderLevel);
+    }
+
+    @SubscribeEvent
+    public static void onClientTick(ClientTickEvent.Post event) {
+        ForcedWeather weather = forcedWeather;
+        if (weather == null) {
+            return;
+        }
+        ClientLevel level = Minecraft.getInstance().level;
+        if (level == null) {
+            return;
+        }
+        if (level != forcedLevel) {
+            // A dimension change replaced the level; its weather is the new vanilla baseline.
+            forcedLevel = level;
+            rememberVanillaWeather(level);
+        }
+        // A weather packet may have written real values this tick; keep them for the stop.
+        if (level.rainLevel != appliedRainLevel) {
+            vanillaRainLevel = level.rainLevel;
+        }
+        if (level.thunderLevel != appliedThunderLevel) {
+            vanillaThunderLevel = level.thunderLevel;
+        }
+        applyForcedWeather(level, weather);
     }
 
     private static float channel(int value) {
@@ -116,6 +212,7 @@ public final class ClientDisasterEffects {
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         restoreViewDistance();
         fogColor = null;
+        stopForcedWeather();
     }
 
     private record FogColor(float red, float green, float blue) {

@@ -2,6 +2,7 @@ package com.fst.naturaldisaster.effect;
 
 import com.fst.naturaldisaster.network.ClientFogColorPayload;
 import com.fst.naturaldisaster.network.ClientViewDistancePayload;
+import com.fst.naturaldisaster.network.ClientWeatherPayload;
 import net.minecraft.core.Holder;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffect;
@@ -23,6 +24,11 @@ import java.util.Objects;
  * {@link #resetViewDistance(ServerPlayer)} or when the client leaves the server. A future
  * disaster that needs a lasting effect should re-apply it while the disaster is active instead of
  * relying on a single message after a re-login.
+ *
+ * <p>Forced weather is display-only as well: {@link #forceWeather(ServerPlayer, ForcedWeather)}
+ * makes the client render rain or a thunderstorm, and {@link #stopForcedWeather(ServerPlayer)}
+ * returns the client to the weather state the server last reported. The server's own weather,
+ * level data and precipitation tick are never read for, or changed by, these calls.
  */
 public final class DisasterEffects {
     /** Lowest view distance accepted by the vanilla options screen. */
@@ -107,6 +113,33 @@ public final class DisasterEffects {
     public static void clearFogColor(ServerPlayer player) {
         Objects.requireNonNull(player, "player");
         PacketDistributor.sendToPlayer(player, ClientFogColorPayload.clear());
+    }
+
+    /**
+     * Makes the target player's client render the given weather until
+     * {@link #stopForcedWeather(ServerPlayer)} is sent or the client leaves the server.
+     *
+     * <p>Only the client's rain/thunder render levels change: the server's weather cycle, level
+     * data and precipitation tick are untouched, and no rain particles or lightning are spawned on
+     * the server. The client keeps rendering the forced weather while the override is active, even
+     * if the server pushes an unrelated weather update; stopping restores the last weather values
+     * the server reported.
+     *
+     * @param weather weather to display; {@link ForcedWeather#THUNDER} implies full rain as well
+     */
+    public static void forceWeather(ServerPlayer player, ForcedWeather weather) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(weather, "weather");
+        PacketDistributor.sendToPlayer(player, ClientWeatherPayload.force(weather));
+    }
+
+    /**
+     * Clears the forced weather display on the target player's client and lets vanilla weather
+     * rendering resume. Idempotent when no override is active.
+     */
+    public static void stopForcedWeather(ServerPlayer player) {
+        Objects.requireNonNull(player, "player");
+        PacketDistributor.sendToPlayer(player, ClientWeatherPayload.stop());
     }
 
     private static void requireFogComponent(String name, int value) {
