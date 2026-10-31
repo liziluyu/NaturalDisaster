@@ -1,0 +1,313 @@
+# Golden field fixture: expectations produced by the pure field algorithm.
+# Doubles are the raw IEEE-754 bits (Double.doubleToRawLongBits) in 16-digit hex.
+# Event records include the lifecycle phase, effect gate and current motion-frame radius.
+fixture-version 1
+params id=default centersPerKm2=1 kappa=0x3fd6666666666666 layers=2 coarseCells=8 coarseKappa=0x3fd3333333333333 disasterDurationTicks=6000 disasterRadiusChunks=4 walkSpeedBlocksPerTick=0x3fc28f5c28f5c28f
+params id=n16 centersPerKm2=16 kappa=0x3fd6666666666666 layers=2 coarseCells=8 coarseKappa=0x3fd3333333333333 disasterDurationTicks=6000 disasterRadiusChunks=8 walkSpeedBlocksPerTick=0x3fc28f5c28f5c28f
+params id=n16l1 centersPerKm2=16 kappa=0x3fd6666666666666 layers=1 coarseCells=8 coarseKappa=0x3fd3333333333333 disasterDurationTicks=6000 disasterRadiusChunks=8 walkSpeedBlocksPerTick=0x3fc28f5c28f5c28f
+params id=alt centersPerKm2=64 kappa=0x3fe999999999999a layers=2 coarseCells=4 coarseKappa=0x3ff199999999999a disasterDurationTicks=4000 disasterRadiusChunks=12 walkSpeedBlocksPerTick=0x3fc28f5c28f5c28f
+case id=default-seed0-overworld-t0 params=default seed=0 dimension=minecraft:overworld dimensionHash=-1627090188 tick=0 motionStep=0
+center i=0 j=0 x=0x408448e483fa5628 z=0x403abca82aa01100
+center i=1 j=0 x=0x409ebb52d0587d70 z=0xc06d9c53a8afc020
+center i=0 j=1 x=0x408e4a3367635778 z=0x409467d0a3f16c68
+center i=-1 j=-1 x=0x40701acc5c231cf0 z=0xc0429561863150c0
+center i=7 j=-3 x=0x40bf878ad0b79bb0 z=0xc0aabe0d667ae540
+chunk cx=40 cz=1 hits=1
+hit gridX=0 gridZ=0 x=0x408448e483fa5628 z=0x403abca82aa01100 radiusChunks=3
+chunk cx=1064 cz=1 hits=0
+chunk cx=0 cz=0 hits=1
+hit gridX=-1 gridZ=0 x=0xc014cb1a00667800 z=0x404231f46aa33880 radiusChunks=4
+chunk cx=-1 cz=-1 hits=1
+hit gridX=-1 gridZ=0 x=0xc014cb1a00667800 z=0x404231f46aa33880 radiusChunks=4
+event i=0 j=0 active=true startTick=-1879 elapsed=1879 remaining=4121 phase=GROWING effectActive=true radiusChunks=3
+event i=1 j=0 active=true startTick=-803 elapsed=803 remaining=5197 phase=WARNING effectActive=false radiusChunks=2
+event i=-1 j=-1 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=-1992 j=1556 active=true startTick=0 elapsed=0 remaining=6000 phase=WARNING effectActive=false radiusChunks=2
+event i=-1988 j=-1378 active=true startTick=-5999 elapsed=5999 remaining=1 phase=DECAYING effectActive=true radiusChunks=2
+case id=default-seed0-nether-t0 params=default seed=0 dimension=minecraft:the_nether dimensionHash=-1385860216 tick=0 motionStep=0
+center i=0 j=0 x=0x409376ec310289c6 z=0x408905a92046e790
+center i=1 j=0 x=0x409f40d19da2617c z=0x408b430abbc5a9d0
+center i=0 j=1 x=0x409316c4af95dc20 z=0x409d6ba8bd8cd250
+center i=-1 j=-1 x=0x4090bed8329aca84 z=0xc053304110140800
+center i=7 j=-3 x=0x40c0c2d5a01f79e6 z=0xc0a9f6337d4898f8
+chunk cx=77 cz=50 hits=1
+hit gridX=0 gridZ=0 x=0x409376ec310289c6 z=0x408905a92046e790 radiusChunks=4
+chunk cx=1101 cz=50 hits=0
+event i=0 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=1 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=-1 j=-1 active=true startTick=-3792 elapsed=3792 remaining=2208 phase=GROWING effectActive=true radiusChunks=4
+case id=default-seed0-custom-t0 params=default seed=0 dimension=fst:golden_dimension dimensionHash=-478635545 tick=0 motionStep=0
+center i=0 j=0 x=0x4092eecb43b636cc z=0xc07295422b75cb50
+center i=1 j=0 x=0x40a24a11b56db6aa z=0x4074cde35891d290
+center i=0 j=1 x=0x409901500268fdb0 z=0x40931dc532949a08
+center i=-1 j=-1 x=0xc095abec0c459a68 z=0xc065c926b81aebe0
+center i=7 j=-3 x=0x40bde5b17ab45388 z=0xc09e4ae74a98ec9e
+chunk cx=75 cz=-19 hits=1
+hit gridX=0 gridZ=0 x=0x4092eecb43b636cc z=0xc07295422b75cb50 radiusChunks=4
+chunk cx=1099 cz=-19 hits=0
+event i=0 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=1 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=-1 j=-1 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=default-seed-1-overworld-t0 params=default seed=-1 dimension=minecraft:overworld dimensionHash=-1627090188 tick=0 motionStep=0
+center i=0 j=0 x=0x408e731c790e52e8 z=0xc041bec247da5b40
+center i=1 j=0 x=0x409cea31b5b7e590 z=0xc080c2257a86fe4a
+center i=0 j=1 x=0x40886bf1e3717b58 z=0x407eeb7f697d9a20
+center i=-1 j=-1 x=0xc04f56f9dee71cc0 z=0x40834b4593ed69d6
+center i=7 j=-3 x=0x40c01dfdea7cb0c1 z=0xc0a3ac3bd9de1dd0
+chunk cx=60 cz=-3 hits=1
+hit gridX=0 gridZ=0 x=0x408e731c790e52e8 z=0xc041bec247da5b40 radiusChunks=4
+chunk cx=1084 cz=-3 hits=0
+event i=0 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=1 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=-1 j=-1 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=default-seed-min-overworld-t0 params=default seed=-9223372036854775808 dimension=minecraft:overworld dimensionHash=-1627090188 tick=0 motionStep=0
+center i=0 j=0 x=0xc07a40b82773cc50 z=0xc07cb5987370bca0
+center i=1 j=0 x=0x407ded97856e1e00 z=0xc07254ecd0e07cf8
+center i=0 j=1 x=0xc0815fd4c9681d30 z=0x4091d131282ec0f0
+center i=-1 j=-1 x=0x4052a3c48cc6ad80 z=0x40310febe02d9300
+center i=7 j=-3 x=0x40c15d2c71d13e36 z=0xc092fc116cc205c0
+chunk cx=-27 cz=-29 hits=1
+hit gridX=0 gridZ=0 x=0xc07a40b82773cc50 z=0xc07cb5987370bca0 radiusChunks=4
+chunk cx=997 cz=-29 hits=0
+event i=0 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=1 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=-1 j=-1 active=true startTick=-3021 elapsed=3021 remaining=2979 phase=GROWING effectActive=true radiusChunks=4
+case id=default-seed-regular-overworld-t0 params=default seed=123456789012345 dimension=minecraft:overworld dimensionHash=-1627090188 tick=0 motionStep=0
+center i=0 j=0 x=0x4084793b1fc8ecc8 z=0x407b6a761ff2f2c0
+center i=1 j=0 x=0x40a07f3d2958cb20 z=0x4033ce35daf9a600
+center i=0 j=1 x=0x40901ef5bb6171d4 z=0x40903d03eb702454
+center i=-1 j=-1 x=0xc06670e7e331bc40 z=0xc0769f098bc74230
+center i=7 j=-3 x=0x40bd8306da0e3d3c z=0xc0a7c89dab705fa8
+chunk cx=40 cz=27 hits=1
+hit gridX=0 gridZ=0 x=0x4084793b1fc8ecc8 z=0x407b6a761ff2f2c0 radiusChunks=4
+chunk cx=1064 cz=27 hits=0
+event i=0 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=1 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=-1 j=-1 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=default-seed0-overworld-t-401 params=default seed=0 dimension=minecraft:overworld dimensionHash=-1627090188 tick=-401 motionStep=-21
+center i=0 j=0 x=0x408423edeabba3dc z=0x404cc3cb7c135080
+center i=1 j=0 x=0x409f9200c9d06ddc z=0xc06ba07b0efe06a0
+center i=0 j=1 x=0x408dfb2d9f9b9878 z=0x4095f9457da03c40
+center i=-1 j=-1 x=0x4070acff17f0a268 z=0x404e43bb62fdb180
+center i=7 j=-3 x=0x40bfb9515d3521e8 z=0xc0aa4d590eca7720
+chunk cx=39 cz=3 hits=1
+hit gridX=0 gridZ=0 x=0x408423edeabba3dc z=0x404cc3cb7c135080 radiusChunks=3
+chunk cx=1063 cz=3 hits=0
+event i=0 j=0 active=true startTick=-1879 elapsed=1478 remaining=4522 phase=GROWING effectActive=true radiusChunks=3
+event i=1 j=0 active=true startTick=-803 elapsed=402 remaining=5598 phase=WARNING effectActive=false radiusChunks=2
+event i=-1 j=-1 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=default-seed0-overworld-t-200 params=default seed=0 dimension=minecraft:overworld dimensionHash=-1627090188 tick=-200 motionStep=-10
+center i=0 j=0 x=0x4084367fe0b729e0 z=0x4046874067180e00
+center i=1 j=0 x=0x409f2217c1e59890 z=0xc06cbfbd8c23da40
+center i=0 j=1 x=0x408e25ba1427ea20 z=0x409530f3890d6a50
+center i=-1 j=-1 x=0x407066f37b9ea798 z=0x4021f1d0777a9c00
+center i=7 j=-3 x=0x40bfa05f29df71e4 z=0xc0aa86b27b17116e
+chunk cx=40 cz=3 hits=1
+hit gridX=0 gridZ=0 x=0x4084367fe0b729e0 z=0x4046874067180e00 radiusChunks=3
+chunk cx=1064 cz=3 hits=0
+event i=0 j=0 active=true startTick=-1879 elapsed=1679 remaining=4321 phase=GROWING effectActive=true radiusChunks=3
+event i=1 j=0 active=true startTick=-803 elapsed=603 remaining=5397 phase=WARNING effectActive=false radiusChunks=2
+event i=-1 j=-1 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=default-seed0-overworld-t-1 params=default seed=0 dimension=minecraft:overworld dimensionHash=-1627090188 tick=-1 motionStep=-1
+center i=0 j=0 x=0x408446ff5e3c7a88 z=0x403ce58fa4588d00
+center i=1 j=0 x=0x409ec59701ae33d4 z=0xc06d87918b194200
+center i=0 j=1 x=0x408e46b037be7368 z=0x40947ca2cab6b964
+center i=-1 j=-1 x=0x407022b7ec69f730 z=0xc0404c9cc9c94600
+center i=7 j=-3 x=0x40bf8a1c8b9fc6cc z=0xc0aab86c80278ab8
+chunk cx=40 cz=3 hits=1
+hit gridX=0 gridZ=0 x=0x408446ff5e3c7a88 z=0x403ce58fa4588d00 radiusChunks=3
+chunk cx=1064 cz=3 hits=0
+event i=0 j=0 active=true startTick=-1879 elapsed=1878 remaining=4122 phase=GROWING effectActive=true radiusChunks=3
+event i=1 j=0 active=true startTick=-803 elapsed=802 remaining=5198 phase=WARNING effectActive=false radiusChunks=2
+event i=-1 j=-1 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=default-seed0-overworld-t1 params=default seed=0 dimension=minecraft:overworld dimensionHash=-1627090188 tick=1 motionStep=0
+center i=0 j=0 x=0x408448e483fa5628 z=0x403abca82aa01100
+center i=1 j=0 x=0x409ebb52d0587d70 z=0xc06d9c53a8afc020
+center i=0 j=1 x=0x408e4a3367635778 z=0x409467d0a3f16c68
+center i=-1 j=-1 x=0x40701acc5c231cf0 z=0xc0429561863150c0
+center i=7 j=-3 x=0x40bf878ad0b79bb0 z=0xc0aabe0d667ae540
+chunk cx=40 cz=1 hits=1
+hit gridX=0 gridZ=0 x=0x408448e483fa5628 z=0x403abca82aa01100 radiusChunks=3
+chunk cx=1064 cz=1 hits=0
+event i=0 j=0 active=true startTick=-1879 elapsed=1880 remaining=4120 phase=GROWING effectActive=true radiusChunks=3
+event i=1 j=0 active=true startTick=-803 elapsed=804 remaining=5196 phase=WARNING effectActive=false radiusChunks=2
+event i=-1 j=-1 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=default-seed0-overworld-t199 params=default seed=0 dimension=minecraft:overworld dimensionHash=-1627090188 tick=199 motionStep=9
+center i=0 j=0 x=0x408460d05b6e3a94 z=0x4010815d6ffc6c00
+center i=1 j=0 x=0x409e5f8d65d5a870 z=0xc06e4e4e9fcdfa20
+center i=0 j=1 x=0x408e68146bfc3250 z=0x4093a661bc64be44
+center i=-1 j=-1 x=0x406fa54d204389e0 z=0xc0536c7d20ee46e0
+center i=7 j=-3 x=0x40bf6f9c9ac9e070 z=0xc0aaf136318e1dcc
+chunk cx=40 cz=1 hits=1
+hit gridX=0 gridZ=0 x=0x408460d05b6e3a94 z=0x4010815d6ffc6c00 radiusChunks=3
+chunk cx=1064 cz=1 hits=0
+event i=0 j=0 active=true startTick=-1879 elapsed=2078 remaining=3922 phase=GROWING effectActive=true radiusChunks=3
+event i=1 j=0 active=true startTick=-803 elapsed=1002 remaining=4998 phase=WARNING effectActive=false radiusChunks=2
+event i=-1 j=-1 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=default-seed0-overworld-t200 params=default seed=0 dimension=minecraft:overworld dimensionHash=-1627090188 tick=200 motionStep=10
+center i=0 j=0 x=0x408464799e0f46e0 z=0x3ff490c6742db000
+center i=1 j=0 x=0x409e557568073f5c z=0xc06e615e1cf881c0
+center i=0 j=1 x=0x408e6b2eb3728ad8 z=0x409390489c0907b8
+center i=-1 j=-1 x=0x406f955b586f4570 z=0xc05487f3af619220
+center i=7 j=-3 x=0x40bf6cdde0155824 z=0xc0aaf6eca7f7458c
+chunk cx=41 cz=-2 hits=1
+hit gridX=0 gridZ=0 x=0x408464799e0f46e0 z=0x3ff490c6742db000 radiusChunks=3
+chunk cx=1065 cz=-2 hits=0
+event i=0 j=0 active=true startTick=-1879 elapsed=2079 remaining=3921 phase=GROWING effectActive=true radiusChunks=3
+event i=1 j=0 active=true startTick=-803 elapsed=1003 remaining=4997 phase=WARNING effectActive=false radiusChunks=2
+event i=-1 j=-1 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=default-seed0-overworld-t201 params=default seed=0 dimension=minecraft:overworld dimensionHash=-1627090188 tick=201 motionStep=10
+center i=0 j=0 x=0x408464799e0f46e0 z=0x3ff490c6742db000
+center i=1 j=0 x=0x409e557568073f5c z=0xc06e615e1cf881c0
+center i=0 j=1 x=0x408e6b2eb3728ad8 z=0x409390489c0907b8
+center i=-1 j=-1 x=0x406f955b586f4570 z=0xc05487f3af619220
+center i=7 j=-3 x=0x40bf6cdde0155824 z=0xc0aaf6eca7f7458c
+chunk cx=41 cz=-2 hits=1
+hit gridX=0 gridZ=0 x=0x408464799e0f46e0 z=0x3ff490c6742db000 radiusChunks=3
+chunk cx=1065 cz=-2 hits=0
+event i=0 j=0 active=true startTick=-1879 elapsed=2080 remaining=3920 phase=GROWING effectActive=true radiusChunks=3
+event i=1 j=0 active=true startTick=-803 elapsed=1004 remaining=4996 phase=WARNING effectActive=false radiusChunks=2
+event i=-1 j=-1 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=default-seed0-overworld-t100000 params=default seed=0 dimension=minecraft:overworld dimensionHash=-1627090188 tick=100000 motionStep=5000
+center i=0 j=0 x=0x408b315986d530d0 z=0x40639cd00115c620
+center i=1 j=0 x=0x40a19b5fa97c6fca z=0x4061f825f84fe060
+center i=0 j=1 x=0x409073d0edc82b00 z=0x409500ac035d92ec
+center i=-1 j=-1 x=0xc060468b28caea70 z=0xc05082d9d45003c0
+center i=7 j=-3 x=0x40bf0930ac64b12c z=0xc0a364993bbae0de
+chunk cx=36 cz=38 hits=0
+chunk cx=1060 cz=38 hits=0
+event i=0 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=1 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=-1 j=-1 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=n16-seed-1-overworld-t-1 params=n16 seed=-1 dimension=minecraft:overworld dimensionHash=-1627090188 tick=-1 motionStep=-1
+center i=0 j=0 x=0x406e938878529550 z=0xc026abdbc1b7eb40
+center i=1 j=0 x=0x407d22dc13b1daac z=0xc060ba7b52307974
+center i=0 j=1 x=0x40689779fa76c6a8 z=0x405e56d898db2b40
+center i=-1 j=-1 x=0xc02e91bc2ed42a40 z=0x4063bd4ea28124b4
+center i=7 j=-3 x=0x40a01b46193683ac z=0xc0838da2cbe00564
+chunk cx=16 cz=-5 hits=2
+hit gridX=0 gridZ=-1 x=0x407380e4d5e05af4 z=0xc05e586b9c1e6ce0 radiusChunks=8
+hit gridX=0 gridZ=0 x=0x406e938878529550 z=0xc026abdbc1b7eb40 radiusChunks=8
+chunk cx=1042 cz=-5 hits=0
+event i=0 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=1 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=-1 j=-1 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=n16-seed0-nether-t200 params=n16 seed=0 dimension=minecraft:the_nether dimensionHash=-1385860216 tick=200 motionStep=10
+center i=0 j=0 x=0x4075664cc60e77a8 z=0x4066425b07c4a0f0
+center i=1 j=0 x=0x408032c22454789a z=0x406c5648e7943e80
+center i=0 j=1 x=0x407448c1eaf20128 z=0x407ded803cd9ddbc
+center i=-1 j=-1 x=0x406f4320f5204a68 z=0xc036d8ce2c2cfbc0
+center i=7 j=-3 x=0x40a098e9362021fe z=0xc08a00be62b4735c
+chunk cx=23 cz=9 hits=1
+hit gridX=0 gridZ=0 x=0x4075664cc60e77a8 z=0x4066425b07c4a0f0 radiusChunks=8
+chunk cx=1062 cz=9 hits=1
+hit gridX=68 gridZ=0 x=0x40d0af3caa39f254 z=0x406b959f9ba8fabc radiusChunks=8
+event i=0 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=1 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=-1 j=-1 active=true startTick=-3792 elapsed=3992 remaining=2008 phase=GROWING effectActive=true radiusChunks=8
+case id=n16l1-seed-1-overworld-t201 params=n16l1 seed=-1 dimension=minecraft:overworld dimensionHash=-1627090188 tick=201 motionStep=10
+center i=0 j=0 x=0x405c67894433882f z=0x4066cf3496c27b61
+center i=1 j=0 x=0x4073a9b6b36c595e z=0x4049b8895480ce1b
+center i=0 j=1 x=0x404fcd422a03fa0b z=0x4074869141531ea3
+center i=-1 j=-1 x=0xc05c7e7b66187359 z=0xc05f598fb23ce2f3
+center i=7 j=-3 x=0x409d3357ff800e04 z=0xc0846a71567e59e2
+chunk cx=7 cz=10 hits=1
+hit gridX=0 gridZ=0 x=0x405c67894433882f z=0x4066cf3496c27b61 radiusChunks=8
+chunk cx=1056 cz=10 hits=0
+event i=0 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=1 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=-1 j=-1 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=n16l1-seed0-custom-t100000 params=n16l1 seed=0 dimension=fst:golden_dimension dimensionHash=-478635545 tick=100000 motionStep=5000
+center i=0 j=0 x=0x4050f1d4ef2c7fd6 z=0x402f1d1b7f2448f0
+center i=1 j=0 x=0x40742e7af57f16a8 z=0x40699666cc78adf7
+center i=0 j=1 x=0x4062ebdaab79c254 z=0x4078a110011a92cb
+center i=-1 j=-1 x=0xc064ff1f2011fb8f z=0xc066f07e1130a746
+center i=7 j=-3 x=0x409cb9c79e31bc9c z=0xc084559d8b51c6f8
+chunk cx=5 cz=1 hits=1
+hit gridX=0 gridZ=0 x=0x4050f1d4ef2c7fd6 z=0x402f1d1b7f2448f0 radiusChunks=8
+chunk cx=1029 cz=1 hits=0
+event i=0 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=1 j=0 active=true startTick=97200 elapsed=2800 remaining=3200 phase=GROWING effectActive=true radiusChunks=7
+event i=-1 j=-1 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=alt-seed-regular-overworld-t250 params=alt seed=123456789012345 dimension=minecraft:overworld dimensionHash=-1627090188 tick=250 motionStep=12
+center i=0 j=0 x=0x405f7a77d29cb34c z=0x40338a4f02e709c0
+center i=1 j=0 x=0x40727be26e1f504e z=0xc049dda5a8488b08
+center i=0 j=1 x=0x406535fa9ed05ef4 z=0x40574d57c27ec4e0
+center i=-1 j=-1 x=0x403acb4a7671a920 z=0xc0561b7430f43f30
+center i=7 j=-3 x=0x408de638c52e4b6a z=0xc0801fcc52d352c4
+chunk cx=7 cz=0 hits=7
+hit gridX=-1 gridZ=-1 x=0x403acb4a7671a920 z=0xc0561b7430f43f30 radiusChunks=12
+hit gridX=0 gridZ=-1 x=0x40633f5cb0d9468c z=0xc058186e64d44a64 radiusChunks=12
+hit gridX=0 gridZ=0 x=0x405f7a77d29cb34c z=0x40338a4f02e709c0 radiusChunks=12
+hit gridX=0 gridZ=1 x=0x406535fa9ed05ef4 z=0x40574d57c27ec4e0 radiusChunks=12
+hit gridX=0 gridZ=2 x=0x4064a9c26e4bd142 z=0x40665496764c3286 radiusChunks=12
+hit gridX=1 gridZ=0 x=0x40727be26e1f504e z=0xc049dda5a8488b08 radiusChunks=12
+hit gridX=1 gridZ=1 x=0x406d1016a6ae0098 z=0x40515576feda9abc radiusChunks=12
+chunk cx=1342 cz=0 hits=0
+event i=0 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=1 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+event i=-1 j=-1 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=default-seed0-overworld-large-pos params=default seed=0 dimension=minecraft:overworld dimensionHash=-1627090188 tick=-200 motionStep=-10
+center i=30000 j=30000 x=0x417c9c62dbfe0208 z=0x417c9c5586eba54c
+center i=29999 j=30001 x=0x417c9bc1cd2284e8 z=0x417c9c62628b88fc
+center i=-30000 j=-30000 x=0xc17c9c86af49c3d0 z=0xc17c9c32032a6050
+center i=-30001 j=-29999 x=0xc17c9c78bb1a27b0 z=0xc17c9bfe06fb461c
+center i=0 j=0 x=0x4084367fe0b729e0 z=0x4046874067180e00
+chunk cx=1875040 cz=1875030 hits=1
+hit gridX=30000 gridZ=30000 x=0x417c9c62dbfe0208 z=0x417c9c5586eba54c radiusChunks=4
+chunk cx=1876064 cz=1875030 hits=0
+chunk cx=1875000 cz=1875000 hits=0
+event i=30000 j=30000 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=default-seed0-overworld-large-neg params=default seed=0 dimension=minecraft:overworld dimensionHash=-1627090188 tick=201 motionStep=10
+center i=30000 j=30000 x=0x417c9c67ddef807c z=0x417c9c5400fd1292
+center i=29999 j=30001 x=0x417c9bc1a40ba114 z=0x417c9c67a853cf60
+center i=-30000 j=-30000 x=0xc17c9c83b58b8684 z=0xc17c9c2cdbd90e84
+center i=-30001 j=-29999 x=0xc17c9c797e9dba48 z=0xc17c9bf92f1c10bc
+center i=0 j=0 x=0x408464799e0f46e0 z=0x3ff490c6742db000
+chunk cx=-1875075 cz=-1874987 hits=1
+hit gridX=-30000 gridZ=-30000 x=0xc17c9c83b58b8684 z=0xc17c9c2cdbd90e84 radiusChunks=3
+chunk cx=-1874051 cz=-1874987 hits=0
+chunk cx=-1875000 cz=-1875000 hits=0
+event i=30000 j=30000 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=alt-seed424242-overworld-event-before params=alt seed=424242 dimension=minecraft:overworld dimensionHash=-1627090188 tick=-312 motionStep=-16
+center i=0 j=0 x=0x406c55d500195738 z=0x406c297387102da4
+center i=1 j=0 x=0x40756766903d7f3b z=0x406c0d2af6722b68
+chunk cx=7 cz=11 hits=3
+hit gridX=-1 gridZ=0 x=0x406647a86b2a8cdf z=0x4057776f48a1fc08 radiusChunks=12
+hit gridX=-1 gridZ=1 x=0x406365931db0a042 z=0x406b556d297ceb90 radiusChunks=12
+hit gridX=0 gridZ=0 x=0x406c55d500195738 z=0x406c297387102da4 radiusChunks=8
+chunk cx=1083 cz=11 hits=1
+hit gridX=139 gridZ=1 x=0x40d0c638966a598c z=0x407000ed2f053a16 radiusChunks=12
+event i=0 j=0 active=true startTick=-2076 elapsed=1764 remaining=2236 phase=GROWING effectActive=true radiusChunks=8
+event i=1 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=alt-seed424242-overworld-event-start params=alt seed=424242 dimension=minecraft:overworld dimensionHash=-1627090188 tick=-311 motionStep=-16
+center i=0 j=0 x=0x406c55d500195738 z=0x406c297387102da4
+center i=1 j=0 x=0x40756766903d7f3b z=0x406c0d2af6722b68
+chunk cx=7 cz=11 hits=3
+hit gridX=-1 gridZ=0 x=0x406647a86b2a8cdf z=0x4057776f48a1fc08 radiusChunks=12
+hit gridX=-1 gridZ=1 x=0x406365931db0a042 z=0x406b556d297ceb90 radiusChunks=12
+hit gridX=0 gridZ=0 x=0x406c55d500195738 z=0x406c297387102da4 radiusChunks=8
+chunk cx=1083 cz=11 hits=1
+hit gridX=139 gridZ=1 x=0x40d0c638966a598c z=0x407000ed2f053a16 radiusChunks=12
+event i=0 j=0 active=true startTick=-2076 elapsed=1765 remaining=2235 phase=GROWING effectActive=true radiusChunks=8
+event i=1 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=alt-seed424242-overworld-event-last params=alt seed=424242 dimension=minecraft:overworld dimensionHash=-1627090188 tick=288 motionStep=14
+center i=0 j=0 x=0x4075141d12073c23 z=0x406607ede3eaa06a
+center i=1 j=0 x=0x407c4c8833844dd4 z=0x406c7e09847e1848
+chunk cx=21 cz=10 hits=3
+hit gridX=0 gridZ=0 x=0x4075141d12073c23 z=0x406607ede3eaa06a radiusChunks=10
+hit gridX=0 gridZ=1 x=0x4077feeaccf63334 z=0x40730624a1f9a88c radiusChunks=12
+hit gridX=1 gridZ=0 x=0x407c4c8833844dd4 z=0x406c7e09847e1848 radiusChunks=12
+chunk cx=1094 cz=10 hits=0
+event i=0 j=0 active=true startTick=-2076 elapsed=2364 remaining=1636 phase=GROWING effectActive=true radiusChunks=10
+event i=1 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
+case id=alt-seed424242-overworld-event-after params=alt seed=424242 dimension=minecraft:overworld dimensionHash=-1627090188 tick=289 motionStep=14
+center i=0 j=0 x=0x4075141d12073c23 z=0x406607ede3eaa06a
+center i=1 j=0 x=0x407c4c8833844dd4 z=0x406c7e09847e1848
+chunk cx=21 cz=10 hits=3
+hit gridX=0 gridZ=0 x=0x4075141d12073c23 z=0x406607ede3eaa06a radiusChunks=10
+hit gridX=0 gridZ=1 x=0x4077feeaccf63334 z=0x40730624a1f9a88c radiusChunks=12
+hit gridX=1 gridZ=0 x=0x407c4c8833844dd4 z=0x406c7e09847e1848 radiusChunks=12
+chunk cx=1094 cz=10 hits=0
+event i=0 j=0 active=true startTick=-2076 elapsed=2365 remaining=1635 phase=GROWING effectActive=true radiusChunks=10
+event i=1 j=0 active=false startTick=0 elapsed=0 remaining=0 phase=NONE effectActive=false radiusChunks=0
