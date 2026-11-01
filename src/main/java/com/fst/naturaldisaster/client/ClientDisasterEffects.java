@@ -10,6 +10,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.OptionInstance;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.util.Mth;
+import net.minecraft.world.level.biome.Biome;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -32,8 +33,11 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  * {@code LevelRenderer}, the sky and the rain sound read. Vanilla only changes those levels when a
  * weather packet arrives, so the override is re-asserted every client tick and the last values
  * reported by the server are kept aside; stopping or disconnecting writes those values back so
- * vanilla weather resumes exactly where the server left it. No server weather is changed or
- * simulated.
+ * vanilla weather resumes exactly where the server left it. In addition, a client-only mixin into
+ * {@code LevelRenderer.renderSnowAndRain} asks {@link #forcedPrecipitation()} for the precipitation
+ * type, so rain/thunder/snow are rendered identically in every biome instead of following the
+ * biome's {@code hasPrecipitation} and temperature. No server weather, biome data or shared
+ * {@code Biome} instance is changed or simulated.
  *
  * <p>This class is only loaded on the client. The shared network registration calls
  * {@link #register(PayloadRegistrar)} behind a dist check.
@@ -105,6 +109,21 @@ public final class ClientDisasterEffects {
         });
     }
 
+    /**
+     * Precipitation the client renderer must use while weather is forced.
+     *
+     * <p>Render-only accessor for the client mixin: {@code null} means no forced weather is active
+     * and vanilla per-biome rules must be used. RAIN and THUNDER both render as rain; SNOW renders
+     * as snow. The returned value is independent of the biome under the camera.
+     */
+    public static Biome.Precipitation forcedPrecipitation() {
+        ForcedWeather weather = forcedWeather;
+        if (weather == null) {
+            return null;
+        }
+        return weather == ForcedWeather.SNOW ? Biome.Precipitation.SNOW : Biome.Precipitation.RAIN;
+    }
+
     private static void forceWeather(ForcedWeather weather) {
         ClientLevel level = Minecraft.getInstance().level;
         if (level == null) {
@@ -136,7 +155,9 @@ public final class ClientDisasterEffects {
 
     private static void applyForcedWeather(ClientLevel level, ForcedWeather weather) {
         // Thunder is rendered as getThunderLevel() = lerp(thunder) * getRainLevel(), so a
-        // thunderstorm needs full rain as well; plain rain keeps thunder at zero.
+        // thunderstorm needs full rain as well; rain and snow keep thunder at zero. All three
+        // types need full rain level because renderSnowAndRain is gated on getRainLevel() > 0;
+        // the rain/snow distinction itself comes from forcedPrecipitation().
         appliedRainLevel = 1.0F;
         appliedThunderLevel = weather == ForcedWeather.THUNDER ? 1.0F : 0.0F;
         // setRainLevel/setThunderLevel write both the current and the previous value, so the

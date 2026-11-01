@@ -123,7 +123,12 @@ public final class DisasterDebugCommands {
                         .executes(context -> forceWeather(context, defaultTargets(context), ForcedWeather.THUNDER))
                         .then(Commands.argument("targets", EntityArgument.players())
                                 .executes(context -> forceWeather(context,
-                                        EntityArgument.getPlayers(context, "targets"), ForcedWeather.THUNDER))));
+                                        EntityArgument.getPlayers(context, "targets"), ForcedWeather.THUNDER))))
+                .then(Commands.literal("snow")
+                        .executes(context -> forceWeather(context, defaultTargets(context), ForcedWeather.SNOW))
+                        .then(Commands.argument("targets", EntityArgument.players())
+                                .executes(context -> forceWeather(context,
+                                        EntityArgument.getPlayers(context, "targets"), ForcedWeather.SNOW))));
     }
 
     private static Collection<ServerPlayer> defaultTargets(CommandContext<CommandSourceStack> context)
@@ -225,12 +230,20 @@ public final class DisasterDebugCommands {
             DisasterEffects.forceWeather(player, weather);
         }
         int count = targets.size();
-        String label = weather == ForcedWeather.THUNDER ? "thunderstorm" : "rain";
+        String label = weatherLabel(weather);
         context.getSource().sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
                 "Forcing client-side %s display for %d player(s); "
                         + "run /disaster debug weather stop to clear it.",
                 label, count)), false);
         return count;
+    }
+
+    private static String weatherLabel(ForcedWeather weather) {
+        return switch (weather) {
+            case RAIN -> "rain";
+            case THUNDER -> "thunderstorm";
+            case SNOW -> "snow";
+        };
     }
 
     private static int stopForcedWeather(CommandContext<CommandSourceStack> context,
