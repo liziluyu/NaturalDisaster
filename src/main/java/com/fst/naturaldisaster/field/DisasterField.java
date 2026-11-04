@@ -101,26 +101,48 @@ public final class DisasterField {
      * @param j fine anchor grid Z
      */
     public CenterPosition centerPosition(long tick, int i, int j) {
-        long step = Math.floorDiv(tick, MOTION_STEP_TICKS);
+        long step = motionStep(tick);
         if (step != cachedStep) {
             cachedStep = step;
             fineCache.clear();
             coarseCache.clear();
         }
 
-        long key = key(i, j);
-        CenterPosition cached = fineCache.get(key);
+        long centerId = centerId(i, j);
+        CenterPosition cached = fineCache.get(centerId);
         if (cached != null) {
             return cached;
         }
 
         long motionTick = step * MOTION_STEP_TICKS;
-        CenterPosition position = computePosition(motionTick, i, j);
-        fineCache.put(key, position);
+        CenterPosition position = computePosition(motionTick, i, j, coarseCache);
+        fineCache.put(centerId, position);
         return position;
     }
 
-    private CenterPosition computePosition(long motionTick, int i, int j) {
+    /**
+     * Center position at the 1-second step containing {@code tick}, computed without touching the
+     * per-step caches.
+     *
+     * <p>This is the historical-frame query: it always evaluates the spline for the motion frame that
+     * contains {@code tick}, even when the current frame cache holds another step. Neither
+     * {@link #fineCache} nor {@link #coarseCache} is read or written and {@link #cachedStep} is left
+     * alone, so a look back at an event's start tick cannot evict or pollute the current frame.
+     *
+     * @param i fine anchor grid X
+     * @param j fine anchor grid Z
+     */
+    public CenterPosition centerPositionUncached(long tick, int i, int j) {
+        long motionTick = motionStep(tick) * MOTION_STEP_TICKS;
+        return computePosition(motionTick, i, j, null);
+    }
+
+    /**
+     * Computes a position for {@code motionTick}. Coarse displacements are memoised in
+     * {@code coarseCache} when it is non-null; {@code null} forces a fully uncached evaluation.
+     */
+    private CenterPosition computePosition(long motionTick, int i, int j,
+                                           Long2ObjectOpenHashMap<CenterPosition> coarseCache) {
         double ax = (i + 0.5 + jitter(i, j, P_ANCHOR_X)) * spacing;
         double az = (j + 0.5 + jitter(i, j, P_ANCHOR_Z)) * spacing;
         double sigma = SIGMA_MIN + SIGMA_RANGE * Hash.unit(Hash.mix(seed, dimensionHash, i, j, P_SIGMA));
@@ -139,10 +161,12 @@ public final class DisasterField {
         int bi = (int) Math.floor(ax / coarseSpacing);
         int bj = (int) Math.floor(az / coarseSpacing);
         long coarseKey = key(bi, bj);
-        CenterPosition coarsePosition = coarseCache.get(coarseKey);
+        CenterPosition coarsePosition = coarseCache == null ? null : coarseCache.get(coarseKey);
         if (coarsePosition == null) {
             coarsePosition = computeCoarsePosition(motionTick, bi, bj);
-            coarseCache.put(coarseKey, coarsePosition);
+            if (coarseCache != null) {
+                coarseCache.put(coarseKey, coarsePosition);
+            }
         }
 
         double cax = (bi + 0.5 + jitterCoarse(bi, bj, P_COARSE_ANCHOR_X)) * coarseSpacing;
@@ -403,7 +427,17 @@ public final class DisasterField {
         return value - Math.floor(value);
     }
 
-    private static long key(int i, int j) {
+    /**
+     * Stable identity of the center anchored at fine grid cell {@code (i, j)}.
+     *
+     * <p>This is the map key used by the per-step caches and by the server-side active-center
+     * bookkeeping; it is a pure packing of the two grid coordinates.
+     */
+    public static long centerId(int i, int j) {
         return ((long) i << 32) ^ (j & 0xFFFFFFFFL);
+    }
+
+    private static long key(int i, int j) {
+        return centerId(i, j);
     }
 }

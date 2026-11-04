@@ -3,12 +3,19 @@ package com.fst.naturaldisaster;
 import net.neoforged.neoforge.common.ModConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.util.List;
+
 /**
- * Common config for the disaster-center field.
+ * Common config for the disaster-center field and the disaster tick.
  *
- * <p>These values are part of the field's configuration fingerprint: changing density/kappa/layers
- * re-shuffles every center, walk speed changes path timing, and duration/radius change derived
- * disaster state. They belong to a world snapshot rather than to a per-player preference.
+ * <p>The center values are part of the field's configuration fingerprint: changing
+ * density/kappa/layers re-shuffles every center, walk speed changes path timing, and
+ * duration/radius change derived disaster state. They belong to a world snapshot rather than to a
+ * per-player preference.
+ *
+ * <p>The disaster-tick speeds are not part of that fingerprint. They only decide how many
+ * coordinates an affected loaded chunk selects per tick and never change center positions, event
+ * timing or radii.
  */
 public final class Config {
     public static final ModConfigSpec SPEC;
@@ -20,6 +27,9 @@ public final class Config {
     public final ModConfigSpec.IntValue layers;
     public final ModConfigSpec.IntValue disasterDurationSeconds;
     public final ModConfigSpec.IntValue disasterRadiusChunks;
+    public final ModConfigSpec.IntValue surfaceDisasterTickSpeed;
+    public final ModConfigSpec.IntValue randomDisasterTickSpeed;
+    public final ModConfigSpec.ConfigValue<List<? extends String>> biomeDisasterTypes;
 
     static {
         Pair<Config, ModConfigSpec> pair = new ModConfigSpec.Builder().configure(Config::new);
@@ -58,6 +68,44 @@ public final class Config {
                 .comment("Maximum disaster influence radius in chunks. A chunk is affected when its centre is",
                         "inside the event's current radius; candidate queries always expand by this maximum.")
                 .defineInRange("disasterRadiusChunks", 8, 1, 32);
+
+        builder.pop();
+
+        builder.comment("Disaster tick selection. Speeds only choose how many coordinates each affected loaded chunk selects per tick;",
+                        "they are not part of the center field fingerprint and never change center positions or event state.").push("disasterTicks");
+
+        surfaceDisasterTickSpeed = builder
+                .comment("Surface disaster-tick samples per affected loaded chunk per tick.",
+                        "Each sample picks a random surface column and uses its WORLD_SURFACE top block.",
+                        "0 disables surface selection.")
+                .defineInRange("surfaceDisasterTickSpeed", 2, 0, 32);
+
+        randomDisasterTickSpeed = builder
+                .comment("Random disaster-tick samples per affected loaded chunk per tick.",
+                        "Each sample picks a random position across the chunk's full build height.",
+                        "0 disables random selection.")
+                .defineInRange("randomDisasterTickSpeed", 3, 0, 32);
+
+        builder.pop();
+
+        builder.comment("Biome and biome-tag disaster type overrides. Entries are 'biomeId=typeId' or '#tagId=typeId',",
+                        "for example 'minecraft:snowy_plains=naturaldisaster:snow_storm' or",
+                        "'#minecraft:is_taiga=naturaldisaster:snow_storm'.",
+                        "Exact biome entries always override tags. Tags are tested in list order; the first matching",
+                        "tag wins. An empty list leaves every biome on the default dummy type.",
+                        "Unknown biomes, tags, types or malformed entries are logged and safely ignored; the biome then",
+                        "uses the default type. This map only selects a disaster type per biome: it never changes center",
+                        "positions, event timing, radii or the center field fingerprint. The map is rebuilt from the",
+                        "loaded biome registry and its bound tags when the server starts.")
+                .push("disasterTypes");
+
+        biomeDisasterTypes = builder
+                .comment("One 'biomeId=typeId' or '#tagId=typeId' override per entry.",
+                        "Syntax is validated entry by entry when the server starts, so one malformed string",
+                        "cannot reset the whole list to the empty default.")
+                .defineListAllowEmpty("biomeToType", List.of(),
+                        () -> "minecraft:snowy_plains=naturaldisaster:snow_storm",
+                        element -> element instanceof String);
 
         builder.pop();
     }

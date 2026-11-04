@@ -2,17 +2,22 @@ package com.fst.naturaldisaster.service;
 
 import com.fst.naturaldisaster.Config;
 import com.fst.naturaldisaster.field.CenterHit;
+import com.fst.naturaldisaster.field.CenterPosition;
 import com.fst.naturaldisaster.field.DisasterField;
 import com.fst.naturaldisaster.field.EventState;
 import com.fst.naturaldisaster.field.FieldParams;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,7 +30,13 @@ import java.util.Map;
  * <p>Disasters are only evaluated for chunks that are actually loaded. A chunk is evaluated once
  * when it loads, remembered for as long as it stays loaded, and dropped on unload. The cached result
  * is tagged with the 1-second motion step; if a later query lands in a different step the chunk is
- * re-evaluated lazily, so no per-tick scan of loaded chunks is ever needed.
+ * re-evaluated lazily.
+ *
+ * <p>Every server tick the cached loaded chunks are visited once for the disaster tick: every
+ * active center found among their candidates maintains an {@link ActiveCenterStart} entry, and a
+ * chunk whose current coverage includes at least one {@link EventState#effectActive()} center
+ * selects surface and random coordinates. Selection is the whole job here; no block state is read
+ * and no effect is applied. The chunk cache, not a world scan, is the source of the visited chunks.
  */
 public final class DisasterService {
     public static final DisasterService INSTANCE = new DisasterService();
@@ -72,10 +83,26 @@ public final class DisasterService {
         }
     }
 
-    /** Per-dimension state: one immutable field snapshot plus the loaded-chunk cache. */
+    @SubscribeEvent
+    public void onServerTick(ServerTickEvent.Post event) {
+        for (LevelState state : levels.values()) {
+            state.disasterTick();
+        }
+    }
+
+    /**
+     * Per-dimension state: one immutable field snapshot, the loaded-chunk cache, and the
+     * active-center start-chunk cache maintained once per tick.
+     */
     public static final class LevelState {
+        private final ServerLevel level;
         private final DisasterField field;
+        private final DisasterTickSampler sampler;
         private final Long2ObjectOpenHashMap<ChunkStatus> loadedChunks = new Long2ObjectOpenHashMap<>();
+        /** Start chunk of every center active in this tick's loaded candidates. */
+        private final Long2ObjectOpenHashMap<ActiveCenterStart> startChunks = new Long2ObjectOpenHashMap<>();
+        /** Center ids active in this tick's loaded candidates; prunes {@link #startChunks} afterwards. */
+        private final LongOpenHashSet activeCenterIds = new LongOpenHashSet();
 
         private LevelState(ServerLevel level) {
             FieldParams params = new FieldParams(
@@ -87,14 +114,28 @@ public final class DisasterService {
                     Config.INSTANCE.disasterDurationSeconds.get() * 20,
                     Config.INSTANCE.disasterRadiusChunks.get(),
                     Config.INSTANCE.walkSpeedBlocksPerTick.get());
-            this.field = new DisasterField(
-                    level.getSeed(),
-                    DisasterField.dimensionHash(level.dimension().location().toString()),
-                    params);
+            long seed = level.getSeed();
+            int dimensionHash = DisasterField.dimensionHash(level.dimension().location().toString());
+            this.level = level;
+            this.field = new DisasterField(seed, dimensionHash, params);
+            this.sampler = new DisasterTickSampler(seed, dimensionHash);
         }
 
         public DisasterField field() {
             return field;
+        }
+
+        /**
+         * Start chunk of the active center at fine grid cell {@code (gridX, gridZ)}, or {@code null}
+         * when that center is not active in this tick's loaded-chunk candidates.
+         */
+        public ActiveCenterStart activeCenterStart(int gridX, int gridZ) {
+            return startChunks.get(DisasterField.centerId(gridX, gridZ));
+        }
+
+        /** Immutable snapshot of every active center's start chunk maintained for this tick. */
+        public List<ActiveCenterStart> activeCenterStarts() {
+            return startChunks.isEmpty() ? List.of() : List.copyOf(startChunks.values());
         }
 
         void onChunkLoad(long chunkKey, long tick) {
@@ -103,6 +144,119 @@ public final class DisasterService {
 
         void onChunkUnload(long chunkKey) {
             loadedChunks.remove(chunkKey);
+        }
+
+        /**
+         * Visits this tick's loaded-chunk candidates once: maintains the active-center start-chunk
+         * cache and, when at least one disaster tick speed is non-zero, samples the covered chunks.
+         *
+         * <p>Both speeds are read once per level and tick. The loop walks the loaded-chunk cache, so
+         * unloaded chunks are never visited, nothing is force-loaded, and no world scan happens. A
+         * qualifying chunk is resolved to one {@link LevelChunk} through a non-loading chunk-source
+         * call and then sampled without further chunk lookups. Selection results are not kept:
+         * resolving the block at each coordinate and applying any effect belongs to the future
+         * disaster system.
+         *
+         * <p>The active-center bookkeeping runs even when both speeds are zero; only sampling is
+         * skipped. Start-chunk entries that are not in this tick's active set are dropped at the end
+         * of the tick, so the cache never outlives the event or the loaded candidates.
+         */
+        void disasterTick() {
+            long tick = level.getGameTime();
+            int surfaceSpeed = Config.INSTANCE.surfaceDisasterTickSpeed.get();
+            int randomSpeed = Config.INSTANCE.randomDisasterTickSpeed.get();
+            boolean sample = surfaceSpeed != 0 || randomSpeed != 0;
+
+            activeCenterIds.clear();
+            LongIterator chunks = loadedChunks.keySet().iterator();
+            while (chunks.hasNext()) {
+                long chunkKey = chunks.nextLong();
+                if (!visitEffectCenters(chunkKey, tick) || !sample) {
+                    continue;
+                }
+                int chunkX = ChunkPos.getX(chunkKey);
+                int chunkZ = ChunkPos.getZ(chunkKey);
+                LevelChunk chunk = level.getChunkSource().getChunkNow(chunkX, chunkZ);
+                if (chunk == null) {
+                    continue;
+                }
+                sampler.surface(chunk, tick, surfaceSpeed);
+                sampler.random(chunk, tick, randomSpeed);
+            }
+            pruneStartChunks();
+        }
+
+        /**
+         * Whether at least one effect-active center covers this loaded chunk right now, while also
+         * recording every running center among the candidates.
+         *
+         * <p>The candidate loop never stops at the first effect match: the full walk is what yields
+         * the complete active-center set for this tick. Every candidate whose event is running
+         * (including {@link EventState.Phase#WARNING}) is recorded once in
+         * {@link #activeCenterIds}, and its start chunk is computed at most once even when several
+         * loaded chunks reference the same center. The returned boolean keeps the sampling gate
+         * unchanged: it is set only for an effect-active center whose current radius covers the
+         * chunk.
+         *
+         * <p>This reads the cached maximum-radius candidates directly and applies the current event
+         * radius. It deliberately does not call {@link #status(long, long)} or {@code currentHits}:
+         * the hot path must not allocate a filtered list or a new {@link ChunkStatus}. The public
+         * query's filtering semantics are unchanged.
+         */
+        private boolean visitEffectCenters(long chunkKey, long tick) {
+            ChunkStatus status = loadedChunks.get(chunkKey);
+            if (status == null) {
+                return false;
+            }
+            long step = field.motionStep(tick);
+            if (status.step() != step) {
+                status = evaluate(chunkKey, tick);
+                loadedChunks.put(chunkKey, status);
+            }
+            int chunkX = ChunkPos.getX(chunkKey);
+            int chunkZ = ChunkPos.getZ(chunkKey);
+            List<CenterHit> hits = status.hits();
+            boolean affected = false;
+            for (int index = 0; index < hits.size(); index++) {
+                CenterHit hit = hits.get(index);
+                EventState event = field.event(tick, hit.gridX(), hit.gridZ());
+                if (!event.active()) {
+                    continue;
+                }
+                trackStartChunk(hit.gridX(), hit.gridZ(), event.startTick());
+                if (event.effectActive()
+                        && DisasterField.coversChunk(hit.x(), hit.z(), event.radiusChunks(), chunkX, chunkZ)) {
+                    affected = true;
+                }
+            }
+            return affected;
+        }
+
+        /**
+         * Records one active center for this tick and keeps its start-chunk entry.
+         *
+         * <p>The historical frame position is recomputed only when the center has no entry yet or
+         * its event restarted with a different {@code startTick}; repeated encounters within the
+         * same tick are free. The query never touches the current motion-frame caches.
+         */
+        private void trackStartChunk(int gridX, int gridZ, long startTick) {
+            long centerId = DisasterField.centerId(gridX, gridZ);
+            activeCenterIds.add(centerId);
+            ActiveCenterStart cached = startChunks.get(centerId);
+            if (cached != null && cached.startTick() == startTick) {
+                return;
+            }
+            CenterPosition position = field.centerPositionUncached(startTick, gridX, gridZ);
+            startChunks.put(centerId, new ActiveCenterStart(gridX, gridZ, startTick,
+                    (int) Math.floor(position.x() / 16.0),
+                    (int) Math.floor(position.z() / 16.0)));
+        }
+
+        /** Drops start-chunk entries of centers that left this tick's active set. */
+        private void pruneStartChunks() {
+            if (!startChunks.isEmpty()) {
+                startChunks.keySet().retainAll(activeCenterIds);
+            }
         }
 
         /**

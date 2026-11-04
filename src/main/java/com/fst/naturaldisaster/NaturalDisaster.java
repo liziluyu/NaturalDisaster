@@ -1,6 +1,7 @@
 package com.fst.naturaldisaster;
 
 import com.fst.naturaldisaster.command.DisasterCommands;
+import com.fst.naturaldisaster.disaster.BiomeDisasterTypes;
 import com.fst.naturaldisaster.network.DisasterNetwork;
 import com.fst.naturaldisaster.service.DisasterService;
 import com.fst.naturaldisaster.service.DisasterSyncService;
@@ -41,14 +42,16 @@ public final class NaturalDisaster {
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        LOGGER.info("Natural Disaster common setup: centersPerKm2={}, kappa={}, layers={}, disasterDurationSeconds={}, disasterRadiusChunks={}",
+        LOGGER.info("Natural Disaster common setup: centersPerKm2={}, kappa={}, layers={}, disasterDurationSeconds={}, disasterRadiusChunks={}, surfaceDisasterTickSpeed={}, randomDisasterTickSpeed={}",
                 Config.INSTANCE.centersPerKm2.get(), Config.INSTANCE.kappa.get(),
                 Config.INSTANCE.layers.get(), Config.INSTANCE.disasterDurationSeconds.get(),
-                Config.INSTANCE.disasterRadiusChunks.get());
+                Config.INSTANCE.disasterRadiusChunks.get(),
+                Config.INSTANCE.surfaceDisasterTickSpeed.get(), Config.INSTANCE.randomDisasterTickSpeed.get());
     }
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
+        BiomeDisasterTypes.rebuild(event.getServer().registryAccess(), Config.INSTANCE.biomeDisasterTypes.get());
         LOGGER.info("Natural Disaster attached to server instance");
     }
 

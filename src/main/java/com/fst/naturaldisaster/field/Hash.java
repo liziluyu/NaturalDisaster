@@ -9,7 +9,7 @@ package com.fst.naturaldisaster.field;
  *
  * <p>All operations are plain integer arithmetic and therefore bit-identical across JVMs.
  */
-final class Hash {
+public final class Hash {
     private Hash() {
     }
 
@@ -40,6 +40,17 @@ final class Hash {
         int h = mix(seed, dimension, i, j, purpose);
         h = mix(h ^ (int) slot);
         h = mix(h ^ (int) (slot >>> 32));
+        return h;
+    }
+
+    /**
+     * Variant for per-tick coordinate draws: one independent value per purpose and sample index.
+     *
+     * <p>This is an overload, so the existing time-indexed outputs are unchanged.
+     */
+    public static int mix(long seed, int dimension, int i, int j, int purpose, long slot, int sample) {
+        int h = mix(seed, dimension, i, j, purpose, slot);
+        h = mix(h ^ sample);
         return h;
     }
 
