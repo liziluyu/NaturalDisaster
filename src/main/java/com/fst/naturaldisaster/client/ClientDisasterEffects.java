@@ -6,6 +6,7 @@ import com.fst.naturaldisaster.effect.ForcedWeather;
 import com.fst.naturaldisaster.network.ClientFogColorPayload;
 import com.fst.naturaldisaster.network.ClientViewDistancePayload;
 import com.fst.naturaldisaster.network.ClientWeatherPayload;
+import com.fst.naturaldisaster.network.DisasterRenderPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.OptionInstance;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -49,6 +50,7 @@ public final class ClientDisasterEffects {
     private static final int MAX_CHANNEL = 255;
 
     private static int originalViewDistance = NO_ORIGINAL;
+    private static Integer viewDistanceLimit;
     private static volatile FogColor fogColor;
     private static ForcedWeather forcedWeather;
     private static ClientLevel forcedLevel;
@@ -73,7 +75,9 @@ public final class ClientDisasterEffects {
                 .playToClient(
                         ClientWeatherPayload.TYPE,
                         ClientWeatherPayload.STREAM_CODEC,
-                        ClientDisasterEffects::handleWeather);
+                        ClientDisasterEffects::handleWeather)
+                .playToClient(DisasterRenderPayload.TYPE, DisasterRenderPayload.STREAM_CODEC,
+                        ClientDisasterVisuals::handle);
     }
 
     private static void handleViewDistance(ClientViewDistancePayload payload, IPayloadContext context) {
@@ -81,6 +85,7 @@ public final class ClientDisasterEffects {
             if (payload.restore()) {
                 restoreViewDistance();
             } else {
+                viewDistanceLimit = payload.limitOnly() ? payload.chunks() : null;
                 applyViewDistance(payload.chunks());
             }
         });
@@ -168,6 +173,10 @@ public final class ClientDisasterEffects {
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
+        if (viewDistanceLimit != null
+                && Minecraft.getInstance().options.renderDistance().get() > viewDistanceLimit) {
+            applyViewDistance(viewDistanceLimit);
+        }
         ForcedWeather weather = forcedWeather;
         if (weather == null) {
             return;
@@ -202,12 +211,16 @@ public final class ClientDisasterEffects {
         }
         OptionInstance<Integer> option = minecraft.options.renderDistance();
         int requested = Mth.clamp(chunks, DisasterEffects.MIN_VIEW_DISTANCE, DisasterEffects.MAX_VIEW_DISTANCE);
+        if (viewDistanceLimit != null) {
+            requested = Math.min(requested, option.get());
+        }
         // The option's own maximum depends on the client's available memory; never set a rejected value.
         option.set(option.values().validateValue(requested).orElse(option.get()));
         minecraft.options.broadcastOptions();
     }
 
     private static void restoreViewDistance() {
+        viewDistanceLimit = null;
         if (originalViewDistance == NO_ORIGINAL) {
             return;
         }

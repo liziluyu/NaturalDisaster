@@ -30,6 +30,7 @@ public final class Config {
     public final ModConfigSpec.IntValue surfaceDisasterTickSpeed;
     public final ModConfigSpec.IntValue randomDisasterTickSpeed;
     public final ModConfigSpec.ConfigValue<List<? extends String>> biomeDisasterTypes;
+    public final ModConfigSpec.ConfigValue<List<? extends String>> snowStormBreakableBlocks;
 
     static {
         Pair<Config, ModConfigSpec> pair = new ModConfigSpec.Builder().configure(Config::new);
@@ -92,7 +93,8 @@ public final class Config {
                         "for example 'minecraft:snowy_plains=naturaldisaster:snow_storm' or",
                         "'#minecraft:is_taiga=naturaldisaster:snow_storm'.",
                         "Exact biome entries always override tags. Tags are tested in list order; the first matching",
-                        "tag wins. An empty list leaves every biome on the default dummy type.",
+                        "tag wins. An empty list uses built-in defaults: snowy/icy biomes get snow_storm, others dummy.",
+                        "Built-in snow biomes are tagged naturaldisaster:snow_storm_biomes; explicit config wins.",
                         "Unknown biomes, tags, types or malformed entries are logged and safely ignored; the biome then",
                         "uses the default type. This map only selects a disaster type per biome: it never changes center",
                         "positions, event timing, radii or the center field fingerprint. The map is rebuilt from the",
@@ -107,6 +109,15 @@ public final class Config {
                         () -> "minecraft:snowy_plains=naturaldisaster:snow_storm",
                         element -> element instanceof String);
 
+        builder.pop();
+        builder.comment("Snow storm effects only; never changes the center field fingerprint or lifecycle.")
+                .push("snowStorm");
+        snowStormBreakableBlocks = builder
+                .comment("Breakable surface blocks: block ids or #block tags, combined as a union.",
+                        "Invalid/unknown entries are warned and skipped at server start.",
+                        "Empty disables destruction only; snow and ice remain enabled.")
+                .defineListAllowEmpty("breakableBlocks", List.of("#c:glass_blocks", "#minecraft:crops"),
+                        () -> "minecraft:glass", value -> value instanceof String);
         builder.pop();
     }
 }

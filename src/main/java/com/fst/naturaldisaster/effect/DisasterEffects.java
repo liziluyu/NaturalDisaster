@@ -3,13 +3,18 @@ package com.fst.naturaldisaster.effect;
 import com.fst.naturaldisaster.network.ClientFogColorPayload;
 import com.fst.naturaldisaster.network.ClientViewDistancePayload;
 import com.fst.naturaldisaster.network.ClientWeatherPayload;
+import com.fst.naturaldisaster.network.DisasterRenderPayload;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Server-authoritative primitives shared by every disaster effect.
@@ -41,6 +46,38 @@ public final class DisasterEffects {
     private DisasterEffects() {
     }
 
+    /** Updates the player's transient visual target; the client handles fading independently. */
+    public static void setDisasterRendering(ServerPlayer player, boolean rendering) {
+        Objects.requireNonNull(player, "player");
+        player.getData(PlayerDisasterData.RENDER_STATE).setRendering(rendering);
+        PacketDistributor.sendToPlayer(player,
+                new DisasterRenderPayload(player.level().dimension().location(), rendering));
+    }
+
+    /**
+     * Whether the online player can see the sky from the block containing their eyes.
+     *
+     * <p>Call on the server thread. Uses vanilla sky-light visibility in the player's current
+     * dimension, including vanilla handling of transparent roofs; time of day, weather and client
+     * weather overrides do not affect the result. No vertical block scan is performed.
+     *
+     * @param playerId the player's UUID
+     * @return {@code false} for a null id, no running server or an offline player; otherwise the
+     *         vanilla sky-visibility result
+     */
+    public static boolean isPlayerExposed(UUID playerId) {
+        if (playerId == null) {
+            return false;
+        }
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null) {
+            return false;
+        }
+        ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+        return player != null
+                && player.serverLevel().canSeeSky(BlockPos.containing(player.getEyePosition()));
+    }
+
     /**
      * Lowers (or raises) the target player's client render distance for as long as the override
      * remains active. The client keeps the previous value separately, so calling this repeatedly
@@ -62,6 +99,15 @@ public final class DisasterEffects {
     public static void resetViewDistance(ServerPlayer player) {
         Objects.requireNonNull(player, "player");
         PacketDistributor.sendToPlayer(player, ClientViewDistancePayload.clear());
+    }
+
+    /** Caps client render distance without increasing an already lower setting. */
+    public static void limitViewDistance(ServerPlayer player, int chunks) {
+        Objects.requireNonNull(player, "player");
+        if (chunks < MIN_VIEW_DISTANCE || chunks > MAX_VIEW_DISTANCE) {
+            throw new IllegalArgumentException("view distance limit must be within [2, 32]");
+        }
+        PacketDistributor.sendToPlayer(player, ClientViewDistancePayload.limit(chunks));
     }
 
     /**

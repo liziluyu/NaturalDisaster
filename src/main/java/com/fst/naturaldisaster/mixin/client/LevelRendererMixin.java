@@ -1,10 +1,16 @@
 package com.fst.naturaldisaster.mixin.client;
 
 import com.fst.naturaldisaster.client.ClientDisasterEffects;
+import com.fst.naturaldisaster.client.ClientDisasterVisuals;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.biome.Biome;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
@@ -23,6 +29,42 @@ import org.spongepowered.asm.mixin.injection.Redirect;
  */
 @Mixin(LevelRenderer.class)
 public abstract class LevelRendererMixin {
+    @Unique
+    private boolean naturaldisaster$disasterPass;
+    @Unique
+    private float naturaldisaster$passIntensity = 1f;
+
+    /** Cross-fade vanilla/debug precipitation and snow, including transitions during real rain. */
+    @WrapMethod(method = "renderSnowAndRain")
+    private void naturaldisaster$fadePrecipitation(LightTexture light, float partialTick,
+                                                  double x, double y, double z, Operation<Void> original) {
+        float alpha = ClientDisasterVisuals.intensity(partialTick);
+        boolean previousPass = naturaldisaster$disasterPass;
+        float previousIntensity = naturaldisaster$passIntensity;
+        try {
+            if (alpha < 1f) {
+                naturaldisaster$disasterPass = false;
+                naturaldisaster$passIntensity = 1f - alpha;
+                original.call(light, partialTick, x, y, z);
+            }
+            if (alpha > 0f) {
+                naturaldisaster$disasterPass = true;
+                naturaldisaster$passIntensity = alpha;
+                original.call(light, partialTick, x, y, z);
+            }
+        } finally {
+            naturaldisaster$disasterPass = previousPass;
+            naturaldisaster$passIntensity = previousIntensity;
+        }
+    }
+
+    @Redirect(method = "renderSnowAndRain", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/multiplayer/ClientLevel;getRainLevel(F)F"))
+    private float naturaldisaster$fadeDensity(ClientLevel level, float partialTick) {
+        return naturaldisaster$disasterPass ? naturaldisaster$passIntensity
+                : level.getRainLevel(partialTick) * naturaldisaster$passIntensity;
+    }
+
     /**
      * Keeps the per-position precipitation loop from being skipped in dry biomes while an override
      * is active. The original method is still consulted when nothing is forced.
@@ -33,7 +75,8 @@ public abstract class LevelRendererMixin {
                     value = "INVOKE",
                     target = "Lnet/minecraft/world/level/biome/Biome;hasPrecipitation()Z"))
     private boolean naturaldisaster$hasForcedPrecipitation(Biome biome) {
-        return ClientDisasterEffects.forcedPrecipitation() != null || biome.hasPrecipitation();
+        return naturaldisaster$disasterPass
+                || ClientDisasterEffects.forcedPrecipitation() != null || biome.hasPrecipitation();
     }
 
     /**
@@ -46,6 +89,9 @@ public abstract class LevelRendererMixin {
                     value = "INVOKE",
                     target = "Lnet/minecraft/world/level/biome/Biome;getPrecipitationAt(Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/biome/Biome$Precipitation;"))
     private Biome.Precipitation naturaldisaster$getForcedPrecipitation(Biome biome, BlockPos pos) {
+        if (naturaldisaster$disasterPass) {
+            return Biome.Precipitation.SNOW;
+        }
         Biome.Precipitation forced = ClientDisasterEffects.forcedPrecipitation();
         return forced != null ? forced : biome.getPrecipitationAt(pos);
     }

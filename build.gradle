@@ -71,6 +71,12 @@ neoForge {
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
+// Selector tests use ResourceLocation without booting Minecraft.
+sourceSets.test {
+    compileClasspath += sourceSets.main.compileClasspath
+    runtimeClasspath += sourceSets.main.runtimeClasspath
+}
+
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
     var replaceProperties = [minecraft_version      : minecraft_version,
                              minecraft_version_range: minecraft_version_range,

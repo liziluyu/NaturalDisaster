@@ -2,6 +2,8 @@ package com.fst.naturaldisaster;
 
 import com.fst.naturaldisaster.command.DisasterCommands;
 import com.fst.naturaldisaster.disaster.BiomeDisasterTypes;
+import com.fst.naturaldisaster.effect.SnowStormBlocks;
+import com.fst.naturaldisaster.effect.PlayerDisasterData;
 import com.fst.naturaldisaster.network.DisasterNetwork;
 import com.fst.naturaldisaster.service.DisasterService;
 import com.fst.naturaldisaster.service.DisasterSyncService;
@@ -31,6 +33,7 @@ public final class NaturalDisaster {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     public NaturalDisaster(IEventBus modEventBus, ModContainer modContainer) {
+        PlayerDisasterData.register(modEventBus);
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(DisasterNetwork::register);
 
@@ -52,6 +55,7 @@ public final class NaturalDisaster {
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         BiomeDisasterTypes.rebuild(event.getServer().registryAccess(), Config.INSTANCE.biomeDisasterTypes.get());
+        SnowStormBlocks.rebuild(event.getServer().registryAccess(), Config.INSTANCE.snowStormBreakableBlocks.get());
         LOGGER.info("Natural Disaster attached to server instance");
     }
 

@@ -1,5 +1,6 @@
 package com.fst.naturaldisaster.disaster;
 
+import com.fst.naturaldisaster.NaturalDisaster;
 import com.mojang.logging.LogUtils;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
@@ -31,6 +32,8 @@ import java.util.Map;
  */
 public final class BiomeDisasterTypes {
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final TagKey<Biome> SNOW_STORM_BIOMES = TagKey.create(Registries.BIOME,
+            ResourceLocation.fromNamespaceAndPath(NaturalDisaster.MODID, "snow_storm_biomes"));
 
     private static final Snapshot EMPTY = new Snapshot(Map.of(), List.of());
 
@@ -55,7 +58,7 @@ public final class BiomeDisasterTypes {
     /**
      * Rebuilds the immutable biome-to-type table from the loaded biome registry and bound tags.
      *
-     * <p>Every registered biome starts at {@link DisasterTypes#DUMMY}. Exact biome overrides have
+     * <p>Built-in snowy/icy biomes default to snow storm, all others to dummy. Exact overrides have
      * the highest priority and the last exact entry for a biome wins. Tag overrides are tested in
      * configuration order and the first matching tag wins. Invalid entries and unknown
      * biomes/tags/types are logged and skipped without discarding other entries.
@@ -121,7 +124,10 @@ public final class BiomeDisasterTypes {
                     }
                 }
             }
-            types.put(holder.key().location(), type != null ? type : DisasterTypes.DUMMY);
+            if (type == null) {
+                type = holder.is(SNOW_STORM_BIOMES) ? DisasterTypes.SNOW_STORM : DisasterTypes.DUMMY;
+            }
+            types.put(holder.key().location(), type);
         });
 
         List<ResourceLocation> biomeIds = new ArrayList<>(biomes.keySet());

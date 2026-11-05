@@ -1,6 +1,11 @@
 package com.fst.naturaldisaster.service;
 
 import com.fst.naturaldisaster.Config;
+import com.fst.naturaldisaster.disaster.BiomeDisasterTypes;
+import com.fst.naturaldisaster.disaster.DisasterType;
+import com.fst.naturaldisaster.disaster.DisasterTypes;
+import com.fst.naturaldisaster.effect.DisasterEffectDispatcher;
+import com.fst.naturaldisaster.effect.SnowStormEffects;
 import com.fst.naturaldisaster.field.CenterHit;
 import com.fst.naturaldisaster.field.CenterPosition;
 import com.fst.naturaldisaster.field.DisasterField;
@@ -9,15 +14,18 @@ import com.fst.naturaldisaster.field.FieldParams;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import net.minecraft.core.QuartPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,13 +43,15 @@ import java.util.Map;
  * <p>Every server tick the cached loaded chunks are visited once for the disaster tick: every
  * active center found among their candidates maintains an {@link ActiveCenterStart} entry, and a
  * chunk whose current coverage includes at least one {@link EventState#effectActive()} center
- * selects surface and random coordinates. Selection is the whole job here; no block state is read
- * and no effect is applied. The chunk cache, not a world scan, is the source of the visited chunks.
+ * selects surface and random coordinates. Snow storms consume the surface selection only in
+ * block-ticking chunks; player effects are aggregated afterwards. The existing field alone owns
+ * event timing, lifecycle and coverage. The chunk cache, not a world scan, supplies visited chunks.
  */
 public final class DisasterService {
     public static final DisasterService INSTANCE = new DisasterService();
 
     private final Map<ResourceKey<Level>, LevelState> levels = new HashMap<>();
+    private final DisasterEffectDispatcher effects = new DisasterEffectDispatcher();
 
     private DisasterService() {
     }
@@ -88,6 +98,16 @@ public final class DisasterService {
         for (LevelState state : levels.values()) {
             state.disasterTick();
         }
+        effects.tick(event.getServer(), player -> {
+            LevelState state = levels.get(player.level().dimension());
+            return state != null && state.snowStormChunks.contains(player.chunkPosition().toLong());
+        });
+    }
+
+    @SubscribeEvent
+    public void onServerStopped(ServerStoppedEvent event) {
+        levels.clear();
+        effects.clear();
     }
 
     /**
@@ -103,6 +123,8 @@ public final class DisasterService {
         private final Long2ObjectOpenHashMap<ActiveCenterStart> startChunks = new Long2ObjectOpenHashMap<>();
         /** Center ids active in this tick's loaded candidates; prunes {@link #startChunks} afterwards. */
         private final LongOpenHashSet activeCenterIds = new LongOpenHashSet();
+        private final Long2ObjectOpenHashMap<DisasterType> centerTypes = new Long2ObjectOpenHashMap<>();
+        private final LongOpenHashSet snowStormChunks = new LongOpenHashSet();
 
         private LevelState(ServerLevel level) {
             FieldParams params = new FieldParams(
@@ -138,6 +160,23 @@ public final class DisasterService {
             return startChunks.isEmpty() ? List.of() : List.copyOf(startChunks.values());
         }
 
+        /**
+         * Type for an event's start frame, including centers outside the loaded candidates.
+         * Reuses a matching derived entry when present; otherwise computes without loading chunks
+         * or adding entries to the active-center caches. The caller supplies the field's startTick.
+         */
+        public DisasterType typeForEvent(int gridX, int gridZ, long startTick) {
+            long id = DisasterField.centerId(gridX, gridZ);
+            ActiveCenterStart cached = startChunks.get(id);
+            if (cached != null && cached.startTick() == startTick) {
+                DisasterType type = centerTypes.get(id);
+                if (type != null) {
+                    return type;
+                }
+            }
+            return resolveType(startChunk(gridX, gridZ, startTick));
+        }
+
         void onChunkLoad(long chunkKey, long tick) {
             loadedChunks.put(chunkKey, evaluate(chunkKey, tick));
         }
@@ -153,9 +192,9 @@ public final class DisasterService {
          * <p>Both speeds are read once per level and tick. The loop walks the loaded-chunk cache, so
          * unloaded chunks are never visited, nothing is force-loaded, and no world scan happens. A
          * qualifying chunk is resolved to one {@link LevelChunk} through a non-loading chunk-source
-         * call and then sampled without further chunk lookups. Selection results are not kept:
-         * resolving the block at each coordinate and applying any effect belongs to the future
-         * disaster system.
+         * call and then sampled. Snow storm surface actions run only in block-ticking chunks and
+         * enforce their own loaded-only access boundary; random selection has no effect yet.
+         * Selection results are never cached or persisted.
          *
          * <p>The active-center bookkeeping runs even when both speeds are zero; only sampling is
          * skipped. Start-chunk entries that are not in this tick's active set are dropped at the end
@@ -168,6 +207,7 @@ public final class DisasterService {
             boolean sample = surfaceSpeed != 0 || randomSpeed != 0;
 
             activeCenterIds.clear();
+            snowStormChunks.clear();
             LongIterator chunks = loadedChunks.keySet().iterator();
             while (chunks.hasNext()) {
                 long chunkKey = chunks.nextLong();
@@ -180,7 +220,12 @@ public final class DisasterService {
                 if (chunk == null) {
                     continue;
                 }
-                sampler.surface(chunk, tick, surfaceSpeed);
+                var surface = sampler.surface(chunk, tick, surfaceSpeed);
+                if (snowStormChunks.contains(chunkKey) && level.getChunkSource().isPositionTicking(chunkKey)) {
+                    for (var pos : surface) {
+                        SnowStormEffects.surface(level, pos);
+                    }
+                }
                 sampler.random(chunk, tick, randomSpeed);
             }
             pruneStartChunks();
@@ -227,6 +272,9 @@ public final class DisasterService {
                 if (event.effectActive()
                         && DisasterField.coversChunk(hit.x(), hit.z(), event.radiusChunks(), chunkX, chunkZ)) {
                     affected = true;
+                    if (DisasterTypes.SNOW_STORM.equals(centerTypes.get(DisasterField.centerId(hit.gridX(), hit.gridZ())))) {
+                        snowStormChunks.add(chunkKey);
+                    }
                 }
             }
             return affected;
@@ -246,16 +294,34 @@ public final class DisasterService {
             if (cached != null && cached.startTick() == startTick) {
                 return;
             }
+            startChunks.put(centerId, startChunk(gridX, gridZ, startTick));
+            centerTypes.put(centerId, resolveType(startChunks.get(centerId)));
+        }
+
+        private ActiveCenterStart startChunk(int gridX, int gridZ, long startTick) {
             CenterPosition position = field.centerPositionUncached(startTick, gridX, gridZ);
-            startChunks.put(centerId, new ActiveCenterStart(gridX, gridZ, startTick,
+            return new ActiveCenterStart(gridX, gridZ, startTick,
                     (int) Math.floor(position.x() / 16.0),
-                    (int) Math.floor(position.z() / 16.0)));
+                    (int) Math.floor(position.z() / 16.0));
+        }
+
+        /** Generated surface biome: no chunk lookup, so unloaded starts and reloads agree. */
+        private DisasterType resolveType(ActiveCenterStart start) {
+            int x = start.chunkX() * 16 + 8;
+            int z = start.chunkZ() * 16 + 8;
+            var generator = level.getChunkSource().getGenerator();
+            var randomState = level.getChunkSource().randomState();
+            int y = generator.getBaseHeight(x, z, Heightmap.Types.WORLD_SURFACE_WG, level, randomState) - 1;
+            y = Math.max(level.getMinBuildHeight(), Math.min(level.getMaxBuildHeight() - 1, y));
+            return BiomeDisasterTypes.typeFor(generator.getBiomeSource().getNoiseBiome(
+                    QuartPos.fromBlock(x), QuartPos.fromBlock(y), QuartPos.fromBlock(z), randomState.sampler()));
         }
 
         /** Drops start-chunk entries of centers that left this tick's active set. */
         private void pruneStartChunks() {
             if (!startChunks.isEmpty()) {
                 startChunks.keySet().retainAll(activeCenterIds);
+                centerTypes.keySet().retainAll(activeCenterIds);
             }
         }
 

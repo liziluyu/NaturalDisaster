@@ -35,3 +35,7 @@ side = "BOTH"
 # 客户端渲染注入：仅天气显示（LevelRenderer 雨雪判定），client 数组保证不在专用服务器应用。
 [[mixins]]
 config = "naturaldisaster.client.mixins.json"
+
+# Loaded-only terrain access while a disaster effect is settling; no lifecycle injection.
+[[mixins]]
+config = "naturaldisaster.effects.mixins.json"
