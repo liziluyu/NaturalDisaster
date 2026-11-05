@@ -32,6 +32,14 @@ versionRange = "[1.47.0,)"
 ordering = "AFTER"
 side = "BOTH"
 
+# 可选前置：Cold Sweat。缺失时照常加载，加载状态供后续兼容逻辑查询。
+[[dependencies."${mod_id}"]]
+modId = "cold_sweat"
+type = "optional"
+versionRange = ""
+ordering = "AFTER"
+side = "BOTH"
+
 # 客户端渲染注入：仅天气显示（LevelRenderer 雨雪判定），client 数组保证不在专用服务器应用。
 [[mixins]]
 config = "naturaldisaster.client.mixins.json"

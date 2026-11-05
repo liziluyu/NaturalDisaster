@@ -11,6 +11,7 @@ import com.mojang.logging.LogUtils;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -29,6 +30,9 @@ import org.slf4j.Logger;
 public final class NaturalDisaster {
     /** Must match {@code mod_id} in gradle.properties and META-INF/neoforge.mods.toml. */
     public static final String MODID = "naturaldisaster";
+
+    /** Optional Cold Sweat availability, fixed for this game process on both physical sides. */
+    public static final boolean COLD_SWEAT_LOADED = ModList.get().isLoaded("cold_sweat");
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
