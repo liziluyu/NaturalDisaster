@@ -13,6 +13,8 @@ public final class PlayerDisasterData {
             DeferredRegister.create(NeoForgeRegistries.Keys.ATTACHMENT_TYPES, NaturalDisaster.MODID);
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<DisasterRenderState>> RENDER_STATE =
             TYPES.register("disaster_render_state", () -> AttachmentType.builder(DisasterRenderState::new).build());
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<SnowStormExposure>> SNOW_STORM_EXPOSURE =
+            TYPES.register("snow_storm_exposure", () -> AttachmentType.builder(SnowStormExposure::new).build());
 
     private PlayerDisasterData() {
     }

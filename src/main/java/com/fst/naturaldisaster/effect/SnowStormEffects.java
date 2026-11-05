@@ -1,9 +1,13 @@
 package com.fst.naturaldisaster.effect;
 
+import com.fst.naturaldisaster.Config;
+import com.fst.naturaldisaster.NaturalDisaster;
+import com.fst.naturaldisaster.compat.coldsweat.ColdSweatCompat;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -16,9 +20,60 @@ public final class SnowStormEffects {
     private SnowStormEffects() {
     }
 
-    /** Extension point for freezing; currently only Slowness I, using vanilla effect merging. */
+    /** Called each eligible server tick; temperature/effect refreshes are throttled internally. */
     public static boolean freezePlayer(ServerPlayer player) {
-        return DisasterEffects.applyMobEffect(player, MobEffects.MOVEMENT_SLOWDOWN, FREEZE_DURATION_TICKS, 0);
+        if (!player.isAlive() || player.isCreative() || player.isSpectator()) {
+            stopFreezingPlayer(player);
+            return false;
+        }
+        boolean entering = !isPlayerFreezing(player);
+        player.getData(PlayerDisasterData.SNOW_STORM_EXPOSURE).refresh(player.level());
+        if (NaturalDisaster.COLD_SWEAT_LOADED) {
+            return ColdSweatCompat.freezePlayer(player);
+        }
+        if (entering || player.tickCount % 20 == 0) {
+            DisasterEffects.applyMobEffect(player, MobEffects.MOVEMENT_SLOWDOWN, FREEZE_DURATION_TICKS, 0);
+        }
+        return true;
+    }
+
+    /** Stop only our contribution; native freezing and unrelated potion/temperature effects remain. */
+    public static void stopFreezingPlayer(ServerPlayer player) {
+        if (player.hasData(PlayerDisasterData.SNOW_STORM_EXPOSURE)) {
+            player.getData(PlayerDisasterData.SNOW_STORM_EXPOSURE).clear();
+        }
+        if (NaturalDisaster.COLD_SWEAT_LOADED) {
+            ColdSweatCompat.stopFreezingPlayer(player);
+        }
+    }
+
+    public static boolean isPlayerFreezing(ServerPlayer player) {
+        return player.isAlive() && !player.isCreative() && !player.isSpectator()
+                && player.hasData(PlayerDisasterData.SNOW_STORM_EXPOSURE)
+                && player.getData(PlayerDisasterData.SNOW_STORM_EXPOSURE).isActive(player.level());
+    }
+
+    /** Used at vanilla's thaw step, before native frost slowdown and freeze damage are evaluated. */
+    public static int frozenTicksAfterThaw(ServerPlayer player, int vanillaTicks) {
+        if (NaturalDisaster.COLD_SWEAT_LOADED || !isPlayerFreezing(player) || !player.canFreeze()
+                || player.isOnFire() || player.isInLava()) {
+            return vanillaTicks;
+        }
+        int interval = Config.INSTANCE.snowStormFreezingIntervalTicks.get();
+        if (interval == 0) {
+            return vanillaTicks;
+        }
+        int increase = player.tickCount % interval == 0 ? 1 : 0;
+        return Math.max(vanillaTicks, Math.min(player.getTicksRequiredToFreeze(), player.getTicksFrozen() + increase));
+    }
+
+    /** Full armor protects against storm freeze damage, while buildup and real powder snow remain native. */
+    public static boolean blocksStormFreezeDamage(ServerPlayer player) {
+        return !NaturalDisaster.COLD_SWEAT_LOADED && isPlayerFreezing(player) && !player.isInPowderSnow
+                && !player.getItemBySlot(EquipmentSlot.HEAD).isEmpty()
+                && !player.getItemBySlot(EquipmentSlot.CHEST).isEmpty()
+                && !player.getItemBySlot(EquipmentSlot.LEGS).isEmpty()
+                && !player.getItemBySlot(EquipmentSlot.FEET).isEmpty();
     }
 
     /** One sampled surface point, at most one mutation; caller has checked coverage and ticking. */

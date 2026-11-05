@@ -31,6 +31,8 @@ public final class Config {
     public final ModConfigSpec.IntValue randomDisasterTickSpeed;
     public final ModConfigSpec.ConfigValue<List<? extends String>> biomeDisasterTypes;
     public final ModConfigSpec.ConfigValue<List<? extends String>> snowStormBreakableBlocks;
+    public final ModConfigSpec.DoubleValue snowStormCoolingCelsius;
+    public final ModConfigSpec.IntValue snowStormFreezingIntervalTicks;
 
     static {
         Pair<Config, ModConfigSpec> pair = new ModConfigSpec.Builder().configure(Config::new);
@@ -112,6 +114,15 @@ public final class Config {
         builder.pop();
         builder.comment("Snow storm effects only; never changes the center field fingerprint or lifecycle.")
                 .push("snowStorm");
+        snowStormCoolingCelsius = builder
+                .comment("Relative ambient cooling in Celsius when Cold Sweat is installed. Positive means colder; 0 disables cooling.",
+                        "Effect-only setting; does not change the center field fingerprint or lifecycle.")
+                .defineInRange("coolingCelsius", 20.0, 0.0, 200.0);
+        snowStormFreezingIntervalTicks = builder
+                .comment("Without Cold Sweat: ticks per +1 native frozen tick. Smaller means faster; default 4 is four times slower than powder snow.",
+                        "0 disables storm freezing accumulation and allows normal thawing. Slowness remains enabled.",
+                        "Effect-only setting; does not change the center field fingerprint or lifecycle.")
+                .defineInRange("freezingIntervalTicks", 4, 0, 1200);
         snowStormBreakableBlocks = builder
                 .comment("Breakable surface blocks: block ids or #block tags, combined as a union.",
                         "Invalid/unknown entries are warned and skipped at server start.",

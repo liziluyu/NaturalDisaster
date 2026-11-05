@@ -1,6 +1,7 @@
 package com.fst.naturaldisaster;
 
 import com.fst.naturaldisaster.command.DisasterCommands;
+import com.fst.naturaldisaster.compat.coldsweat.ColdSweatCompat;
 import com.fst.naturaldisaster.disaster.BiomeDisasterTypes;
 import com.fst.naturaldisaster.effect.SnowStormBlocks;
 import com.fst.naturaldisaster.effect.PlayerDisasterData;
@@ -38,6 +39,9 @@ public final class NaturalDisaster {
 
     public NaturalDisaster(IEventBus modEventBus, ModContainer modContainer) {
         PlayerDisasterData.register(modEventBus);
+        if (COLD_SWEAT_LOADED) {
+            ColdSweatCompat.register();
+        }
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(DisasterNetwork::register);
 

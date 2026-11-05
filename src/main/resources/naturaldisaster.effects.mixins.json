@@ -3,6 +3,6 @@
   "minVersion": "0.8",
   "package": "com.fst.naturaldisaster.mixin",
   "compatibilityLevel": "JAVA_21",
-  "mixins": ["LevelEffectAccessMixin"],
+  "mixins": ["LevelEffectAccessMixin", "LivingEntityFreezingMixin"],
   "injectors": { "defaultRequire": 1 }
 }

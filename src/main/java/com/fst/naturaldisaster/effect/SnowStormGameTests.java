@@ -6,8 +6,6 @@ import com.fst.naturaldisaster.network.DisasterRenderPayload;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.SnowLayerBlock;
@@ -25,7 +23,8 @@ public final class SnowStormGameTests {
     @SuppressWarnings("removal")
     @GameTest(template = "empty", timeoutTicks = 100)
     public static void renderingFlagBelongsToThePlayer(GameTestHelper helper) {
-        var player = helper.makeMockServerPlayerInLevel();
+        var player = FreezingGameTests.makePlayer(helper, "rendering");
+        player.setGameMode(net.minecraft.world.level.GameType.CREATIVE);
         var server = helper.getLevel().getServer();
         var dispatcher = new DisasterEffectDispatcher();
         // The mock connection has no login handshake; advertise the client channel explicitly.
@@ -42,31 +41,12 @@ public final class SnowStormGameTests {
             helper.assertTrue(state.intensity(1f) == 0f, "server does not simulate client visual progress");
             dispatcher.tick(server, target -> false);
             helper.assertTrue(!state.isRendering(), "leaving coverage clears the player flag");
-            helper.assertTrue(player.getActiveEffects().isEmpty(), "creative player receives no freezing effect");
+            helper.assertTrue(!player.hasEffect(net.minecraft.world.effect.MobEffects.MOVEMENT_SLOWDOWN),
+                    "creative player receives no fallback slowness");
             helper.succeed();
         } finally {
             dispatcher.clear();
             server.getPlayerList().remove(player);
-        }
-    }
-
-    @SuppressWarnings("removal")
-    @GameTest(template = "empty", timeoutTicks = 100)
-    public static void freezingOnlyAppliesSlowness(GameTestHelper helper) {
-        var player = helper.makeMockServerPlayerInLevel();
-        try {
-            helper.assertTrue(SnowStormEffects.freezePlayer(player), "initial freezing is accepted");
-            var effect = player.getEffect(MobEffects.MOVEMENT_SLOWDOWN);
-            helper.assertTrue(effect != null && effect.getAmplifier() == 0 && effect.getDuration() == 60,
-                    "freezing is Slowness I for exactly 60 ticks");
-            helper.assertTrue(player.getActiveEffects().size() == 1, "no other freezing effects are added");
-            player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 200, 2));
-            SnowStormEffects.freezePlayer(player);
-            helper.assertTrue(player.getEffect(MobEffects.MOVEMENT_SLOWDOWN).getAmplifier() == 2,
-                    "freezing does not replace a stronger existing slowness effect");
-            helper.succeed();
-        } finally {
-            helper.getLevel().getServer().getPlayerList().remove(player);
         }
     }
 

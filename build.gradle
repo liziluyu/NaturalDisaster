@@ -9,6 +9,10 @@ group = mod_group_id
 repositories {
     mavenLocal()
     mavenCentral()
+    exclusiveContent {
+        forRepository { maven { url = 'https://api.modrinth.com/maven' } }
+        filter { includeGroup 'maven.modrinth' }
+    }
 }
 
 base {
@@ -28,6 +32,12 @@ dependencies {
     // 生产环境由玩家自行把该 mod 放进 mods/；neoforge.mods.toml 里声明为 optional 软依赖。
     compileOnly files('libs/xaeroworldmap-neoforge-1.21.1-1.47.0.jar')
     runtimeOnly files('libs/xaeroworldmap-neoforge-1.21.1-1.47.0.jar')
+
+    // Cold Sweat 2.4.5, official Minecraft 1.21.1 NeoForge release (Modrinth version ID).
+    compileOnly 'maven.modrinth:cold-sweat:LTu4f6QB'
+    if (providers.gradleProperty('withColdSweat').map { it.toBoolean() }.getOrElse(false)) {
+        runtimeOnly 'maven.modrinth:cold-sweat:LTu4f6QB'
+    }
 }
 
 neoForge {
@@ -47,6 +57,9 @@ neoForge {
 
         gameTestServer {
             type = "gameTestServer"
+            if (providers.gradleProperty('gameTestDirectory').isPresent()) {
+                gameDirectory = file(providers.gradleProperty('gameTestDirectory').get())
+            }
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 

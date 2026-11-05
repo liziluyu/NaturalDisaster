@@ -21,6 +21,7 @@ public final class DisasterEffectDispatcher {
             DisasterRenderState visual = player.getData(PlayerDisasterData.RENDER_STATE);
             boolean covered = player.isAlive() && snowStormCoverage.test(player);
             if (!covered) {
+                SnowStormEffects.stopFreezingPlayer(player);
                 if (previous != null || visual.isRendering()) {
                     DisasterEffects.setDisasterRendering(player, false);
                     applied.remove(player.getUUID());
@@ -33,10 +34,12 @@ public final class DisasterEffectDispatcher {
                 DisasterEffects.setDisasterRendering(player, true);
                 applied.put(player.getUUID(), new AppliedPlayer(player, player.level().dimension()));
             }
-            if ((changed || server.getTickCount() % 20 == 0) && !player.isCreative() && !player.isSpectator()
+            if (!player.isCreative() && !player.isSpectator()
                     && player.serverLevel().isPositionEntityTicking(player.blockPosition())
                     && DisasterEffects.isPlayerExposed(player.getUUID())) {
                 SnowStormEffects.freezePlayer(player);
+            } else {
+                SnowStormEffects.stopFreezingPlayer(player);
             }
         }
     }
